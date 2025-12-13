@@ -1,6 +1,7 @@
 <?php
-/* require_once $_SERVER['DOCUMENT_ROOT'] . '/Sistema-de-pagos-IESTP-/config/conexion-local.php';
-$pagina = $_GET['pagina'] ?? 'panel-admin'; */
+
+require_once __DIR__ . '/../../../config/conexion.php';
+$pagina = $_GET['pagina'] ?? 'panel-admin';
 
 switch ($pagina) {
     case 'panel-admin':

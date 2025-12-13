@@ -1,0 +1,187 @@
+// ============================================================
+// TABLAS PRINCIPALES
+// ============================================================
+
+Table ubdepartamento {
+  id int [pk, increment]
+  departamento varchar(250)
+}
+
+Table ubprovincia {
+  id int [pk, increment]
+  provincia varchar(250)
+  ubdepartamento int [ref: > ubdepartamento.id]
+}
+
+Table ubdistrito {
+  id int [pk, increment]
+  distrito varchar(250)
+  ubprovincia int [ref: > ubprovincia.id]
+}
+
+Table estudiante {
+  id int [pk, increment]
+  ubdistrito int [ref: > ubdistrito.id, null]
+  dni_est char(8)
+  ap_est varchar(40)
+  am_est varchar(40)
+  nom_est varchar(40)
+  sex_est char(1)
+  cel_est char(9)
+  ubigeodir_est char(6)
+  ubigeonac_est char(6)
+  dir_est varchar(40)
+  mailp_est varchar(40)
+  maili_est varchar(40)
+  fecnac_est date
+  foto_est varchar(40)
+  estado int [null]
+}
+
+Table prog_estudios {
+  id int [pk, increment]
+  nom_progest varchar(40)
+  perfilingre_progest text
+  perfilegre_progest text
+}
+
+Table empleado {
+  id int [pk, increment]
+  prog_estudios int [ref: > prog_estudios.id]
+  dni_emp char(8)
+  apnom_emp varchar(60)
+  sex_emp char(1)
+  cel_emp char(9)
+  ubigeodir_emp char(6)
+  ubigeonac_emp char(6)
+  dir_emp varchar(40)
+  mailp_emp varchar(40)
+  maili_emp varchar(40)
+  fecnac_emp date
+  cargo_emp char(1)
+  cond_emp char(1)
+  id_progest char(3)
+  fecinc_emp date
+  foto_emp varchar(40)
+  estado int
+}
+
+Table matricula {
+  id int [pk, increment]
+  estudiante int [ref: > estudiante.id]
+  prog_estudios int [ref: > prog_estudios.id]
+  id_matricula char(9)
+  per_lectivo varchar(7)
+  per_acad varchar(3)
+  per_acad2 int(1)
+  seccion char(1)
+  turno char(1)
+  fec_matricula date
+  cond_matricula char(1)
+  est_matricula char(1)
+  est_perlec char(1)
+  obs_matricula varchar(50)
+}
+
+Table usuarios {
+  id int [pk, increment]
+  usuario varchar(200)
+  password text
+  tipo int
+  estuempleado int
+  token text
+}
+
+Table resoluciones {
+  id int [pk, increment]
+  numero_resolucion varchar(50) [unique]
+  titulo varchar(255)
+  texto_respaldo text
+  monto_descuento decimal(10,2)
+  ruta_documento varchar(255)
+  fecha_inicio date
+  fecha_fin date
+  estado boolean [default: false]
+  creado_por int [ref: > empleado.id]
+  creado_en datetime
+}
+
+Table solicitudes {
+  id int [pk, increment]
+  estudiante int [ref: > estudiante.id]
+  resoluciones int [ref: > resoluciones.id, null]
+  tipo_solicitud varchar(100)
+  descripcion text
+  estado enum('pendiente','en_evaluacion','aprobado','rechazado') [default: 'pendiente']
+  fecha_solicitud datetime
+  fecha_revision datetime [null]
+  empleado int [ref: > empleado.id, null]
+  observaciones text [null]
+  foto text [null]
+}
+
+Table historial_solicitudes {
+  id int [pk, increment]
+  solicitud_id int [ref: > solicitudes.id]
+  estado varchar(50)
+  fecha datetime
+  empleado int [ref: > empleado.id]
+  comentarios text
+}
+
+Table beneficiarios {
+  id int [pk, increment]
+  estudiante int [ref: > estudiante.id]
+  resoluciones int [ref: > resoluciones.id]
+  porcentaje_descuento decimal(5,2)
+  fecha_inicio date
+  fecha_fin date
+  activo boolean [default: true]
+  registrado_por int [ref: > empleado.id]
+  registrado_en datetime
+}
+
+Table historial_descuentos {
+  id int [pk, increment]
+  beneficiario_id int [ref: > beneficiarios.id]
+  monto_original decimal(10,2)
+  porcentaje_descuento decimal(5,2)
+  monto_descuento decimal(10,2)
+  monto_final decimal(10,2)
+  aplicado_por int [ref: > empleado.id]
+  aplicado_en datetime
+  observaciones varchar(255) [null]
+}
+
+Table tipo_pago {
+  id int [pk, increment]
+  nombre varchar(50) [unique]
+  descripcion varchar(150) [null]
+}
+
+Table pagos {
+  id int [pk, increment]
+  estudiante int [ref: > estudiante.id]
+  solicitudes int [ref: > solicitudes.id, null]
+  tipo_pago int [ref: > tipo_pago.id]
+  monto_original decimal(10,2)
+  monto_descuento decimal(10,2) [default: 0.00]
+  monto_final decimal(10,2)
+  fecha_pago datetime
+  comprobante varchar(255) [null]
+  registrado_por int [ref: > empleado.id]
+  registrado_en datetime
+}
+
+Table notificaciones_bienestar {
+  id int [pk, increment]
+  tipo varchar(50)
+  titulo varchar(255)
+  mensaje text
+  id_resolucion int [ref: > resoluciones.id, null]
+  id_empleado_creador int [ref: > empleado.id, null]
+  id_empleado_revisor int [ref: > empleado.id, null]
+  estado_notificacion varchar(20) [default: 'no_leida']
+  creado_en datetime [default: `CURRENT_TIMESTAMP`]
+  leido_en datetime [null]
+}

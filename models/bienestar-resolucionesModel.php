@@ -38,6 +38,7 @@ class ResolucionModel {
             'numero_resolucion',
             'titulo',
             'texto_respaldo',
+            'monto_descuento',
             'ruta_documento',
             'fecha_inicio',
             'fecha_fin'
@@ -47,6 +48,7 @@ class ResolucionModel {
             ':numero_resolucion',
             ':titulo',
             ':texto_respaldo',
+            ':monto_descuento',
             ':ruta_documento',
             ':fecha_inicio',
             ':fecha_fin'
@@ -56,6 +58,9 @@ class ResolucionModel {
             ':numero_resolucion' => $data['numero_resolucion'],
             ':titulo' => $data['titulo'],
             ':texto_respaldo' => $data['texto_respaldo'] ?? null,
+            ':monto_descuento' => isset($data['monto_descuento']) && $data['monto_descuento'] !== ''
+                ? (float)$data['monto_descuento']
+                : null,
             ':ruta_documento' => $rutaDocumento,
             ':fecha_inicio' => $data['fecha_inicio'] ?? null,
             ':fecha_fin' => $data['fecha_fin'] ?? null
@@ -89,6 +94,7 @@ class ResolucionModel {
                 e.apnom_emp AS creado_por_nombre
             FROM resoluciones r
             LEFT JOIN empleado e ON e.id = r.creado_por
+            WHERE r.estado = true
             ORDER BY r.creado_en DESC
         ");
         $sql->execute();

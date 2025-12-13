@@ -49,8 +49,10 @@
                 Ver
               </button>
 
-              <button class="px-4 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800 transition">
-                Descargar
+              <button 
+                onclick="descargarComprobante('Matrícula', '7984219838', 'MTR-2025', '000123')"
+                class="px-4 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800 transition flex items-center gap-2">
+                <i class="fas fa-download"></i> Descargar
               </button>
             </div>
 
@@ -92,8 +94,10 @@
                 Ver
               </button>
 
-              <button class="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition">
-                Descargar
+              <button 
+                onclick="descargarComprobante('Carnet Medio Pasaje', '7984219838', 'CMP-2025', '000456')"
+                class="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition flex items-center gap-2">
+                <i class="fas fa-download"></i> Descargar
               </button>
             </div>
 
@@ -135,8 +139,10 @@
                 Ver
               </button>
 
-              <button class="px-4 py-2 bg-lime-500 text-white rounded-lg font-medium hover:bg-lime-600 transition">
-                Descargar
+              <button 
+                onclick="descargarComprobante('Folder de Prácticas', '7984219838', 'FDP-2025', '000789')"
+                class="px-4 py-2 bg-lime-500 text-white rounded-lg font-medium hover:bg-lime-600 transition flex items-center gap-2">
+                <i class="fas fa-download"></i> Descargar
               </button>
             </div>
 
@@ -225,6 +231,27 @@
 
     function closeModal() {
       document.getElementById("modal").classList.add("hidden");
+    }
+
+    function descargarComprobante(tipo, codigo, serie, numero) {
+      // Construir la URL del controlador
+      const currentPath = window.location.pathname;
+      let baseUrl;
+      
+      if (currentPath.includes('/views/')) {
+        baseUrl = currentPath.substring(0, currentPath.indexOf('/views/'));
+      } else {
+        baseUrl = '';
+      }
+      
+      const url = baseUrl + '/controller/descargarComprobante.php?tipo=' + encodeURIComponent(tipo) + 
+                  '&codigo=' + encodeURIComponent(codigo) + 
+                  '&serie=' + encodeURIComponent(serie) + 
+                  '&numero=' + encodeURIComponent(numero) + 
+                  '&download=1';
+      
+      // Abrir en nueva ventana para imprimir/guardar como PDF
+      window.open(url, '_blank');
     }
   </script>
 

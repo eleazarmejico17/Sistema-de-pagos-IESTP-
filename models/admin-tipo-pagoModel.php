@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../config/conexion-local.php';
+require_once __DIR__ . '/../config/conexion.php';
 
 class TipoPago {
 

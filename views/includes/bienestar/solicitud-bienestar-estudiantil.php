@@ -6,36 +6,59 @@ $errorConsulta = null;
 $totalSolicitudes = 0;
 
 try {
-    $db = Database::getInstance()->getConnection();
+    // Intentar con Database primero, luego con Conexion para compatibilidad
+    if (class_exists('Database')) {
+        $db = Database::getInstance()->getConnection();
+    } elseif (class_exists('Conexion')) {
+        $db = Conexion::getInstance()->getConnection();
+    } else {
+        throw new Exception("No se encontró la clase de conexión");
+    }
 
-    // Primero verificar que la tabla existe y tiene datos
-    $checkTable = $db->query("SHOW TABLES LIKE 'solicitud'");
+    // Primero verificar que la tabla 'solicitudes' existe
+    $checkTable = $db->query("SHOW TABLES LIKE 'solicitudes'");
     if ($checkTable->rowCount() === 0) {
-        throw new Exception("La tabla 'solicitud' no existe en la base de datos");
+        throw new Exception("La tabla 'solicitudes' no existe en la base de datos");
     }
 
     // Contar total de solicitudes
-    $countStmt = $db->query("SELECT COUNT(*) as total FROM solicitud");
+    $countStmt = $db->query("SELECT COUNT(*) as total FROM solicitudes");
     $totalSolicitudes = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
 
     // Obtener todas las solicitudes con información completa
+    // Usamos la estructura real: solicitudes + estudiante
     $sql = "SELECT 
                 s.id,
-                s.nombre,
-                s.telefono,
-                s.correo,
+                CONCAT(e.ap_est, ' ', e.am_est, ' ', e.nom_est) AS nombre,
+                e.cel_est AS telefono,
+                e.mailp_est AS correo,
                 s.tipo_solicitud,
                 s.descripcion,
-                s.archivos,
-                s.fecha,
-                COALESCE(s.estado, 'Pendiente') AS estado,
-                s.motivo_respuesta,
-                s.fecha_respuesta,
-                s.fecha_registro,
-                COALESCE(e.apnom_emp, '') AS empleado_nombre
-            FROM solicitud s
-            LEFT JOIN empleado e ON e.id = s.empleado_id
-            ORDER BY COALESCE(s.fecha_registro, s.fecha, NOW()) DESC";
+                s.foto AS archivos,
+                s.fecha_solicitud AS fecha,
+                CASE 
+                    WHEN s.estado = 'aprobado' THEN 'Aprobado'
+                    WHEN s.estado = 'aprobada' THEN 'Aprobado'
+                    WHEN s.estado = 'Aprobado' THEN 'Aprobado'
+                    WHEN s.estado = 'APROBADO' THEN 'Aprobado'
+                    WHEN s.estado = 'rechazado' THEN 'Rechazado'
+                    WHEN s.estado = 'rechazada' THEN 'Rechazado'
+                    WHEN s.estado = 'Rechazado' THEN 'Rechazado'
+                    WHEN s.estado = 'RECHAZADO' THEN 'Rechazado'
+                    WHEN s.estado = 'en_evaluacion' THEN 'En evaluación'
+                    WHEN s.estado = 'evaluacion' THEN 'En evaluación'
+                    WHEN s.estado = 'En evaluación' THEN 'En evaluación'
+                    WHEN s.estado = 'EN_EVALUACION' THEN 'En evaluación'
+                    ELSE 'Pendiente'
+                END AS estado,
+                s.observaciones AS motivo_respuesta,
+                s.fecha_revision AS fecha_respuesta,
+                s.fecha_solicitud AS fecha_registro,
+                s.estado AS estado_original,
+                '' AS empleado_nombre
+            FROM solicitudes s
+            LEFT JOIN estudiante e ON e.id = s.estudiante
+            ORDER BY s.id DESC, COALESCE(s.fecha_revision, s.fecha_solicitud, NOW()) DESC";
     
     $stmt = $db->prepare($sql);
     $stmt->execute();
@@ -133,50 +156,50 @@ $rechazadas = count(array_filter($solicitudes, fn($s) => ($s['estado'] ?? '') ==
 
 <!-- Estadísticas rápidas -->
 <section class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-    <div class="stat-badge rounded-xl p-3 text-white card-anim" style="--gradient: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); animation-delay: 0.1s">
+    <div class="stat-badge rounded-xl p-3 text-white card-anim" style="--gradient: linear-gradient(135deg, #1f2937 0%, #111827 100%); animation-delay: 0.1s">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-white/90 text-xs font-medium mb-1">Pendientes</p>
-                <p class="text-2xl font-bold"><?= $pendientes ?></p>
+                <p class="text-gray-900 text-xs font-bold mb-1">Pendientes</p>
+                <p class="text-2xl font-black text-gray-900"><?= $pendientes ?></p>
             </div>
             <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <i class="fas fa-clock text-lg"></i>
+                <i class="fas fa-clock text-lg text-yellow-400"></i>
             </div>
         </div>
     </div>
     
-    <div class="stat-badge rounded-xl p-3 text-white card-anim" style="--gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); animation-delay: 0.2s">
+    <div class="stat-badge rounded-xl p-3 text-white card-anim" style="--gradient: linear-gradient(135deg, #1f2937 0%, #111827 100%); animation-delay: 0.2s">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-white/90 text-xs font-medium mb-1">En Evaluación</p>
-                <p class="text-2xl font-bold"><?= $enEvaluacion ?></p>
+                <p class="text-gray-900 text-xs font-bold mb-1">En Evaluación</p>
+                <p class="text-2xl font-black text-gray-900"><?= $enEvaluacion ?></p>
             </div>
             <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <i class="fas fa-hourglass-half text-lg"></i>
+                <i class="fas fa-hourglass-half text-lg text-blue-400"></i>
             </div>
         </div>
     </div>
     
-    <div class="stat-badge rounded-xl p-3 text-white card-anim" style="--gradient: linear-gradient(135deg, #10b981 0%, #059669 100%); animation-delay: 0.3s">
+    <div class="stat-badge rounded-xl p-3 text-white card-anim" style="--gradient: linear-gradient(135deg, #1f2937 0%, #111827 100%); animation-delay: 0.3s">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-white/90 text-xs font-medium mb-1">Aprobadas</p>
-                <p class="text-2xl font-bold"><?= $aprobadas ?></p>
+                <p class="text-gray-900 text-xs font-bold mb-1">Aprobadas</p>
+                <p class="text-2xl font-black text-gray-900"><?= $aprobadas ?></p>
             </div>
             <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <i class="fas fa-check-circle text-lg"></i>
+                <i class="fas fa-check-circle text-lg text-green-400"></i>
             </div>
         </div>
     </div>
     
-    <div class="stat-badge rounded-xl p-3 text-white card-anim" style="--gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); animation-delay: 0.4s">
+    <div class="stat-badge rounded-xl p-3 text-white card-anim" style="--gradient: linear-gradient(135deg, #1f2937 0%, #111827 100%); animation-delay: 0.4s">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-white/90 text-xs font-medium mb-1">Rechazadas</p>
-                <p class="text-2xl font-bold"><?= $rechazadas ?></p>
+                <p class="text-gray-900 text-xs font-bold mb-1">Rechazadas</p>
+                <p class="text-2xl font-black text-gray-900"><?= $rechazadas ?></p>
             </div>
             <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <i class="fas fa-times-circle text-lg"></i>
+                <i class="fas fa-times-circle text-lg text-red-400"></i>
             </div>
         </div>
     </div>
@@ -379,45 +402,50 @@ $rechazadas = count(array_filter($solicitudes, fn($s) => ($s['estado'] ?? '') ==
                     </div>
 
                     <!-- Archivos -->
-                    <?php if (!empty($sol['archivos'])): ?>
-                        <div class="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
-                            <div class="flex items-center gap-2 mb-2">
-                                <i class="fas fa-paperclip text-indigo-600 text-sm"></i>
-                                <p class="font-semibold text-gray-700 text-xs">Evidencias Adjuntas</p>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <?php 
-                                $archivos = explode(",", $sol['archivos']);
-                                foreach($archivos as $archivo){
-                                    $archivo = trim($archivo);
-                                    if ($archivo === '') continue;
-                                    
-                                    $ruta = "../uploads/solicitudes/" . rawurlencode($archivo);
-                                    $ext = strtolower(pathinfo($archivo, PATHINFO_EXTENSION));
-                                    $archivoSeguro = htmlspecialchars($archivo, ENT_QUOTES, 'UTF-8');
-
-                                    if (in_array($ext, ['jpg','jpeg','png','gif','webp'])) {
-                                        echo "
-                                        <div onclick='abrirImagen(\"$ruta\")'
-                                             class='group/thumb relative w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-indigo-400 cursor-pointer transition-all hover:shadow-lg'>
-                                            <img src='$ruta' alt='$archivoSeguro' class='w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-300'>
-                                            <div class='absolute inset-0 bg-black/0 group-hover/thumb:bg-black/30 transition-colors flex items-center justify-center'>
-                                                <i class='fas fa-search-plus text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity text-sm'></i>
-                                            </div>
-                                        </div>";
-                                    } else {
-                                        echo "
-                                        <a href='$ruta' target='_blank'
-                                           class='flex flex-col items-center justify-center w-20 h-20 rounded-lg border-2 border-gray-200 hover:border-indigo-400 bg-gray-50 hover:bg-indigo-50 transition-all hover:shadow-lg'>
-                                            <i class='fas fa-file text-xl text-gray-400 mb-1'></i>
-                                            <span class='text-[10px] text-gray-600 text-center px-1 truncate w-full'>$archivoSeguro</span>
-                                        </a>";
-                                    }
-                                }
-                                ?>
-                            </div>
+                    <div class="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fas fa-paperclip text-indigo-600 text-sm"></i>
+                            <p class="font-semibold text-gray-700 text-xs">Evidencias Adjuntas</p>
                         </div>
-                    <?php endif; ?>
+                        <div class="flex flex-wrap gap-2">
+                            <?php 
+                            $archivos = !empty($sol['archivos']) ? explode(",", $sol['archivos']) : [];
+                            $hayArchivos = false;
+
+                            foreach($archivos as $archivo){
+                                $archivo = trim($archivo);
+                                if ($archivo === '') continue;
+
+                                $hayArchivos = true;
+                                $ruta = "../uploads/solicitudes/" . rawurlencode($archivo);
+                                $ext = strtolower(pathinfo($archivo, PATHINFO_EXTENSION));
+                                $archivoSeguro = htmlspecialchars($archivo, ENT_QUOTES, 'UTF-8');
+
+                                if (in_array($ext, ['jpg','jpeg','png','gif','webp'])) {
+                                    echo "
+                                    <div onclick='abrirImagen(\"$ruta\")'
+                                         class='group/thumb relative w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-200 hover:border-indigo-400 cursor-pointer transition-all hover:shadow-lg'>
+                                        <img src='$ruta' alt='$archivoSeguro' class='w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-300'>
+                                        <div class='absolute inset-0 bg-black/0 group-hover/thumb:bg-black/30 transition-colors flex items-center justify-center'>
+                                            <i class='fas fa-search-plus text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity text-sm'></i>
+                                        </div>
+                                    </div>";
+                                } else {
+                                    echo "
+                                    <a href='$ruta' target='_blank'
+                                       class='flex flex-col items-center justify-center w-20 h-20 rounded-lg border-2 border-gray-200 hover:border-indigo-400 bg-gray-50 hover:bg-indigo-50 transition-all hover:shadow-lg'>
+                                        <i class='fas fa-file text-xl text-gray-400 mb-1'></i>
+                                        <span class='text-[10px] text-gray-600 text-center px-1 truncate w-full'>$archivoSeguro</span>
+                                    </a>";
+                                }
+                            }
+
+                            if (!$hayArchivos) {
+                                echo "<p class='text-gray-500 text-xs'>No se adjuntaron evidencias en esta solicitud.</p>";
+                            }
+                            ?>
+                        </div>
+                    </div>
 
                     <!-- Información adicional -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">

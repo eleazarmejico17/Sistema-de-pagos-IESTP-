@@ -1,6 +1,6 @@
 <?php
-require_once "../models/bienestarBeneficiariosModel.php";
-require_once "../models/bienestarResolucionesModel.php";
+require_once __DIR__ . '/../models/bienestar-beneficiariosModel.php';
+require_once __DIR__ . '/../models/bienestar-resolucionesModel.php';
 
 class BienestarRegistroController {
     private $beneficiarioModel;
@@ -17,7 +17,12 @@ class BienestarRegistroController {
 
     
     public function crearBeneficiario($data) {
-        return $this->beneficiarioModel->crear($data);
+        try {
+            return $this->beneficiarioModel->crear($data);
+        } catch (Exception $e) {
+            error_log("Error en crearBeneficiario: " . $e->getMessage());
+            throw $e;
+        }
     }
 
     public function crearResolucion($data, $files = []) {

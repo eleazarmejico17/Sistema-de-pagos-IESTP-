@@ -1,37 +1,136 @@
 <?php
+// La sesión ya está iniciada en dashboard-bienestar.php, no es necesario iniciarla aquí
+
+// Permitir acceso para admin y bienestar
+if (!isset($_SESSION['rol']) || !in_array($_SESSION['rol'], ['admin', 'bienestar'])) {
+    header('Location: ../../../errors/403.html');
+    exit;
+}
+
+// Obtener el rol del usuario para controlar las acciones
+$rolUsuario = $_SESSION['rol'] ?? '';
+
 require_once __DIR__ . '/../../../config/conexion.php';
+
+// Manejar mensajes de status
+$status = $_GET['status'] ?? null;
+$mensajeExito = null;
+if ($status === 'usuario_eliminado') {
+    $mensajeExito = 'Usuario eliminado correctamente';
+}
 
 // Obtener usuarios del sistema
 try {
     $db = Database::getInstance()->getConnection();
-    $usuarios = $db->query("
-        SELECT 
-            u.id,
-            u.usuario,
-            u.nombre_completo,
-            u.correo,
-            r.nombre AS rol_nombre,
-            u.estado,
-            u.creado_en
-        FROM usuarios u
-        LEFT JOIN roles r ON r.id = u.rol_id
-        ORDER BY u.creado_en DESC
-        LIMIT 50
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Primero verificar que la tabla existe y obtener todos los usuarios sin JOIN
+    // Intentar obtener usuarios con o sin columna estado
+    try {
+        $usuariosRaw = $db->query("
+            SELECT 
+                u.id,
+                u.usuario,
+                u.tipo,
+                u.estuempleado
+            FROM usuarios u
+            ORDER BY u.id DESC
+            LIMIT 50
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // Si falla, intentar sin estado
+        $usuariosRaw = $db->query("
+            SELECT 
+                id,
+                usuario,
+                tipo,
+                estuempleado
+            FROM usuarios
+            ORDER BY id DESC
+            LIMIT 50
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    // Luego obtener datos adicionales si hay estuempleado
+    $usuarios = [];
+    foreach ($usuariosRaw as $u) {
+        $nombreCompleto = $u['usuario'] . ' (Usuario)';
+        $correo = null;
+        
+        // Si tiene estuempleado, intentar obtener más datos
+        if (!empty($u['estuempleado'])) {
+            try {
+                if ($u['tipo'] == 1) {
+                    // Empleado
+                    $stmt = $db->prepare("SELECT apnom_emp, mailp_emp FROM empleado WHERE id = :id LIMIT 1");
+                    $stmt->execute([':id' => $u['estuempleado']]);
+                    $emp = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($emp) {
+                        $nombreCompleto = ($emp['apnom_emp'] ?? '') . ' (Empleado)';
+                        $correo = $emp['mailp_emp'] ?? null;
+                    }
+                } elseif ($u['tipo'] == 2) {
+                    // Estudiante
+                    $stmt = $db->prepare("SELECT ap_est, am_est, nom_est, mailp_est FROM estudiante WHERE id = :id LIMIT 1");
+                    $stmt->execute([':id' => $u['estuempleado']]);
+                    $est = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($est) {
+                        $nombreCompleto = trim(($est['ap_est'] ?? '') . ' ' . ($est['am_est'] ?? '') . ' ' . ($est['nom_est'] ?? '')) . ' (Estudiante)';
+                        $correo = $est['mailp_est'] ?? null;
+                    }
+                } elseif ($u['tipo'] == 3) {
+                    // Empresa
+                    $stmt = $db->prepare("SELECT razon_social, email FROM empresa WHERE id = :id LIMIT 1");
+                    $stmt->execute([':id' => $u['estuempleado']]);
+                    $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($empresa) {
+                        $nombreCompleto = ($empresa['razon_social'] ?? '') . ' (Empresa)';
+                        $correo = $empresa['email'] ?? null;
+                    }
+                }
+            } catch (Exception $e) {
+                error_log("Error al obtener datos adicionales para usuario {$u['id']}: " . $e->getMessage());
+            }
+        }
+        
+        $usuarios[] = [
+            'id' => (int)$u['id'],
+            'usuario' => $u['usuario'] ?? '',
+            'tipo' => (int)($u['tipo'] ?? 0),
+            'estado' => $u['estado'] ?? 1, // Si no tiene estado, asumir activo
+            'estuempleado' => !empty($u['estuempleado']) ? (int)$u['estuempleado'] : null,
+            'nombre_completo' => $nombreCompleto,
+            'correo' => $correo,
+            'rol_nombre' => ($u['tipo'] == 1 ? 'Empleado' : ($u['tipo'] == 2 ? 'Estudiante' : ($u['tipo'] == 3 ? 'Empresa' : 'Sin definir')))
+        ];
+    }
     
     // Estadísticas
     $totalUsuarios = count($usuarios);
-    $usuariosActivos = count(array_filter($usuarios, fn($u) => ($u['estado'] ?? '') === 'activo'));
+    $usuariosActivos = count(array_filter($usuarios, fn($u) => ($u['estado'] ?? null) == 1 || ($u['estado'] ?? null) === '1'));
     $usuariosPorRol = [];
     foreach ($usuarios as $u) {
         $rol = $u['rol_nombre'] ?? 'Sin rol';
         $usuariosPorRol[$rol] = ($usuariosPorRol[$rol] ?? 0) + 1;
     }
+    
+    // Debug: Log para verificar que se están obteniendo usuarios
+    error_log("=== DEBUG USUARIOS ===");
+    error_log("Usuarios RAW obtenidos: " . count($usuariosRaw));
+    error_log("Usuarios procesados: " . count($usuarios));
+    if (count($usuariosRaw) > 0) {
+        error_log("Primer usuario RAW: " . json_encode($usuariosRaw[0]));
+    }
+    if (count($usuarios) > 0) {
+        error_log("Primer usuario procesado: " . json_encode($usuarios[0]));
+    }
 } catch (Exception $e) {
+    error_log("Error al obtener usuarios: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
     $usuarios = [];
     $totalUsuarios = 0;
     $usuariosActivos = 0;
     $usuariosPorRol = [];
+    $errorConsulta = $e->getMessage();
 }
 ?>
 
@@ -180,15 +279,43 @@ try {
 
 <!-- TABLA DE USUARIOS -->
 <section class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden card-anim" style="animation-delay: 0.4s">
+  <?php if (isset($mensajeExito)): ?>
+    <div class="bg-green-50 border-l-4 border-green-500 p-4 m-4">
+      <div class="flex items-center gap-2">
+        <i class="fas fa-check-circle text-green-600"></i>
+        <p class="text-green-700 font-semibold"><?= htmlspecialchars($mensajeExito, ENT_QUOTES, 'UTF-8') ?></p>
+      </div>
+    </div>
+  <?php endif; ?>
+  <?php if (isset($errorConsulta)): ?>
+    <div class="bg-red-50 border-l-4 border-red-500 p-4 m-4">
+      <div class="flex items-center gap-2">
+        <i class="fas fa-exclamation-circle text-red-600"></i>
+        <p class="text-red-700 font-semibold">Error al cargar usuarios: <?= htmlspecialchars($errorConsulta, ENT_QUOTES, 'UTF-8') ?></p>
+      </div>
+    </div>
+  <?php endif; ?>
+  <!-- Debug temporal -->
+  <?php if (isset($usuariosRaw)): ?>
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-3 m-4 text-xs">
+      <strong>Debug:</strong> Se encontraron <?= count($usuariosRaw) ?> usuarios en la BD. 
+      Procesados: <?= count($usuarios) ?>
+      <?php if (count($usuariosRaw) > 0): ?>
+        <br>Primero: <?= htmlspecialchars($usuariosRaw[0]['usuario'] ?? 'N/A', ENT_QUOTES, 'UTF-8') ?>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
   <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-4 py-3">
     <div class="flex items-center justify-between">
       <h2 class="text-base font-bold text-white flex items-center gap-2">
         <i class="fas fa-users text-sm"></i>
         <span>Usuarios del Sistema</span>
       </h2>
-      <span class="px-3 py-1 bg-white/20 backdrop-blur-sm text-white rounded-full text-xs font-semibold">
-        <?= $totalUsuarios ?> usuarios
-      </span>
+      <div class="flex items-center gap-3">
+        <span class="px-3 py-1 bg-white/20 backdrop-blur-sm text-white rounded-full text-xs font-semibold">
+          <?= $totalUsuarios ?> usuarios
+        </span>
+      </div>
     </div>
   </div>
   
@@ -219,10 +346,13 @@ try {
       <tbody class="bg-white divide-y divide-gray-200">
         <?php if (empty($usuarios)): ?>
           <tr>
-            <td colspan="6" class="px-3 py-6 text-center">
-              <div class="flex flex-col items-center">
-                <i class="fas fa-inbox text-3xl text-gray-300 mb-2"></i>
-                <p class="text-gray-500 font-medium text-xs">No hay usuarios registrados</p>
+            <td colspan="6" class="px-3 py-8 text-center">
+              <div class="flex flex-col items-center gap-4">
+                <i class="fas fa-inbox text-5xl text-gray-300 mb-2"></i>
+                <div>
+                  <p class="text-gray-700 font-semibold text-base mb-2">No hay usuarios registrados</p>
+                  <p class="text-gray-500 text-sm mb-4">No hay usuarios registrados en el sistema</p>
+                </div>
               </div>
             </td>
           </tr>
@@ -247,10 +377,14 @@ try {
               </div>
             </td>
             <td class="px-3 py-2.5 whitespace-nowrap">
-              <a href="mailto:<?= htmlspecialchars($usuario['correo'] ?? '', ENT_QUOTES, 'UTF-8') ?>" 
-                 class="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium">
-                <?= htmlspecialchars($usuario['correo'] ?? 'N/A', ENT_QUOTES, 'UTF-8') ?>
-              </a>
+              <?php if (!empty($usuario['correo'])): ?>
+                <a href="mailto:<?= htmlspecialchars($usuario['correo'], ENT_QUOTES, 'UTF-8') ?>" 
+                   class="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium">
+                  <?= htmlspecialchars($usuario['correo'], ENT_QUOTES, 'UTF-8') ?>
+                </a>
+              <?php else: ?>
+                <span class="text-xs text-gray-500 font-medium">N/A</span>
+              <?php endif; ?>
             </td>
             <td class="px-3 py-2.5 whitespace-nowrap">
               <?php
@@ -269,7 +403,7 @@ try {
               </span>
             </td>
             <td class="px-3 py-2.5 whitespace-nowrap">
-              <?php if (($usuario['estado'] ?? '') === 'activo'): ?>
+              <?php if (($usuario['estado'] ?? null) == 1 || ($usuario['estado'] ?? null) === '1'): ?>
                 <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold inline-flex items-center gap-1">
                   <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
                   Activo
@@ -282,28 +416,32 @@ try {
               <?php endif; ?>
             </td>
             <td class="px-3 py-2.5 whitespace-nowrap text-center">
-              <div class="action-btn-group justify-center">
-                <button onclick="editarUsuario(<?= (int)($usuario['id'] ?? 0) ?>)" 
-                        class="action-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1"
-                        title="Editar usuario">
-                  <i class="fas fa-edit text-xs"></i>
-                  <span>Editar</span>
-                </button>
+              <?php if ($rolUsuario === 'admin'): ?>
+                <div class="action-btn-group justify-center">
+                  <button onclick="editarUsuario(<?= (int)($usuario['id'] ?? 0) ?>)" 
+                          class="action-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1"
+                          title="Editar usuario">
+                    <i class="fas fa-edit text-xs"></i>
+                    <span>Editar</span>
+                  </button>
 
-                <button onclick="modificarUsuario(<?= (int)($usuario['id'] ?? 0) ?>)" 
-                        class="action-btn bg-amber-500 hover:bg-amber-600 text-white text-xs px-2 py-1"
-                        title="Modificar usuario">
-                  <i class="fas fa-pencil-alt text-xs"></i>
-                  <span>Modificar</span>
-                </button>
+                  <button onclick="modificarUsuario(<?= (int)($usuario['id'] ?? 0) ?>)" 
+                          class="action-btn bg-amber-500 hover:bg-amber-600 text-white text-xs px-2 py-1"
+                          title="Modificar usuario">
+                    <i class="fas fa-pencil-alt text-xs"></i>
+                    <span>Modificar</span>
+                  </button>
 
-                <button onclick="eliminarUsuario(<?= (int)($usuario['id'] ?? 0) ?>, '<?= htmlspecialchars(addslashes($usuario['usuario'] ?? ''), ENT_QUOTES, 'UTF-8') ?>')" 
-                        class="action-btn bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1"
-                        title="Eliminar usuario">
-                  <i class="fas fa-trash-alt text-xs"></i>
-                  <span>Eliminar</span>
-                </button>
-              </div>
+                  <button onclick="eliminarUsuario(<?= (int)($usuario['id'] ?? 0) ?>, '<?= htmlspecialchars(addslashes($usuario['usuario'] ?? ''), ENT_QUOTES, 'UTF-8') ?>')" 
+                          class="action-btn bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1"
+                          title="Eliminar usuario">
+                    <i class="fas fa-trash-alt text-xs"></i>
+                    <span>Eliminar</span>
+                  </button>
+                </div>
+              <?php else: ?>
+                <span class="text-xs text-gray-500 italic">Solo lectura</span>
+              <?php endif; ?>
             </td>
           </tr>
           <?php endforeach; ?>
@@ -401,19 +539,68 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Funciones de acciones
 function editarUsuario(id) {
-  console.log('Editar usuario:', id);
-  // Implementar lógica de edición
+  // Redirigir al dashboard admin para editar usuario
+  // Construir la URL relativa desde la ubicación actual
+  const currentPath = window.location.pathname;
+  
+  // Si estamos en dashboard-bienestar.php, cambiar a dashboard-admin.php
+  let targetPath = currentPath;
+  if (currentPath.includes('dashboard-bienestar.php')) {
+    targetPath = currentPath.replace('dashboard-bienestar.php', 'dashboard-admin.php');
+  } else if (currentPath.includes('/views/')) {
+    // Si estamos en includes, subir un nivel y cambiar a dashboard-admin.php
+    targetPath = currentPath.substring(0, currentPath.lastIndexOf('/')) + '/dashboard-admin.php';
+  } else {
+    // Fallback: construir desde la raíz
+    targetPath = '/views/dashboard-admin.php';
+  }
+  
+  // Construir la URL completa con parámetros
+  const url = window.location.origin + targetPath + '?pagina=admin-agregar-usuario&edit=' + id;
+  window.location.href = url;
 }
 
 function modificarUsuario(id) {
-  console.log('Modificar usuario:', id);
-  // Implementar lógica de modificación
+  // Por ahora, modificar es igual que editar (se puede cambiar después)
+  // Podría abrir un modal o redirigir a otra página de edición
+  editarUsuario(id);
 }
 
 function eliminarUsuario(id, usuario) {
   if (confirm(`¿Estás seguro de eliminar al usuario "${usuario}"?\n\nEsta acción no se puede deshacer.`)) {
-    console.log('Eliminar usuario:', id);
-    // Implementar lógica de eliminación
+    // Crear un formulario oculto y enviarlo
+    const form = document.createElement('form');
+    form.method = 'POST';
+    
+    // Obtener la ruta base del proyecto desde la URL actual
+    const currentPath = window.location.pathname;
+    
+    // Extraer la ruta base (hasta /Sistema-de-pagos-IESTP-main)
+    let basePath = '';
+    if (currentPath.includes('/Sistema-de-pagos-IESTP-main')) {
+      const match = currentPath.match(/^(.+?\/Sistema-de-pagos-IESTP-main)/);
+      if (match) {
+        basePath = match[1];
+      }
+    }
+    
+    // Construir la URL completa al controlador
+    form.action = basePath + '/controller/eliminar-usuario.php';
+    
+    const inputId = document.createElement('input');
+    inputId.type = 'hidden';
+    inputId.name = 'id';
+    inputId.value = id;
+    
+    const inputConfirmar = document.createElement('input');
+    inputConfirmar.type = 'hidden';
+    inputConfirmar.name = 'confirmar';
+    inputConfirmar.value = '1';
+    
+    form.appendChild(inputId);
+    form.appendChild(inputConfirmar);
+    document.body.appendChild(form);
+    form.submit();
   }
 }
 </script>

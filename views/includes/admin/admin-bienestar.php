@@ -39,7 +39,8 @@ if (isset($_GET['delete'])) {
 }
 
 $empleados = $ctrl->listar();
-$uploadsPath = '../uploads/empleados/';
+// Ruta correcta desde views/includes/admin/ hacia uploads/empleados/ en la raíz
+$uploadsPath = '../../../uploads/empleados/';
 
 $oldValue = function (string $key) use ($previousData): string {
     return htmlspecialchars($previousData[$key] ?? '', ENT_QUOTES, 'UTF-8');
@@ -101,10 +102,15 @@ $oldValue = function (string $key) use ($previousData): string {
 
         <td class="p-2">
             <?php if (!empty($e['foto_emp'])): ?>
-                <img src="<?= htmlspecialchars($uploadsPath . rawurlencode($e['foto_emp']), ENT_QUOTES, 'UTF-8') ?>" alt="Foto de <?= htmlspecialchars($e['nombre_completo'], ENT_QUOTES, 'UTF-8') ?>" class="w-12 h-12 rounded-full object-cover border">
+                <img src="<?= htmlspecialchars($uploadsPath . rawurlencode($e['foto_emp']), ENT_QUOTES, 'UTF-8') ?>" 
+                     alt="Foto de <?= htmlspecialchars($e['nombre_completo'], ENT_QUOTES, 'UTF-8') ?>" 
+                     class="w-12 h-12 rounded-full object-cover border shadow-sm"
+                     onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCI+PHJlY3Qgd2lkdGg9IjQ4IiBoZWlnaHQ9IjQ4IiBmaWxsPSIjZTBlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5Y2EzYWIiIGZvbnQtc2l6ZT0iMjAiPj88L3RleHQ+PC9zdmc+';">
             <?php else: ?>
-                <span class="text-gray-500">Sin foto</span>
-            <?php endif ?>
+                <div class="w-12 h-12 rounded-full bg-gray-200 border flex items-center justify-center">
+                    <i class="fas fa-user text-gray-400 text-lg"></i>
+                </div>
+            <?php endif; ?>
         </td>
 
         <td class="p-2">

@@ -1,21 +1,136 @@
 <?php
 require_once __DIR__ . "/../../../config/conexion.php";
 
-$db = Conexion::getInstance()->getConnection();
+// La sesión ya está iniciada desde dashboard-usuario.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-$sql = "SELECT * FROM solicitudes 
-        WHERE estado IN ('Aprobado', 'Rechazado') 
-        AND notificacion_enviada = TRUE
-        ORDER BY fecha_respuesta DESC";
-$stmt = $db->prepare($sql);
-$stmt->execute();
-$notificaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$notificaciones = [];
+$notificacionesPagos = [];
+$errorConsulta = null;
+
+try {
+    $db = Conexion::getInstance()->getConnection();
+    
+    // Obtener ID del usuario actual
+    $usuarioSesion = $_SESSION['usuario'] ?? '';
+    $usuarioId = null;
+    
+    if (!empty($usuarioSesion)) {
+        $stmtUser = $db->prepare("SELECT id FROM usuarios WHERE usuario = :usuario LIMIT 1");
+        $stmtUser->execute([':usuario' => $usuarioSesion]);
+        $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
+        $usuarioId = $user['id'] ?? null;
+    }
+    
+    // Obtener notificaciones de la tabla solicitudes que estén aprobadas o rechazadas
+    $sqlSolicitudes = "SELECT 
+                s.id,
+                CONCAT(e.ap_est, ' ', e.am_est, ' ', e.nom_est) AS nombre,
+                e.cel_est AS telefono,
+                e.mailp_est AS correo,
+                s.tipo_solicitud,
+                s.descripcion,
+                s.foto AS archivos,
+                s.fecha_solicitud AS fecha,
+                COALESCE(s.estado, 'Pendiente') AS estado,
+                s.observaciones AS motivo_respuesta,
+                s.fecha_revision AS fecha_respuesta,
+                s.fecha_solicitud AS fecha_registro,
+                1 AS notificacion_enviada,
+                'solicitud' AS tipo_notificacion
+            FROM solicitudes s
+            LEFT JOIN estudiante e ON s.estudiante = e.id
+            WHERE s.estado IN ('aprobado', 'rechazado')
+            AND s.fecha_revision IS NOT NULL
+            ORDER BY COALESCE(s.fecha_revision, s.fecha_solicitud, NOW()) DESC
+            LIMIT 50";
+    
+    $stmt = $db->prepare($sqlSolicitudes);
+    $stmt->execute();
+    $notificacionesSolicitudes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Obtener notificaciones de pagos desde notificaciones_sistema
+    try {
+        // Verificar si existe la tabla notificaciones_sistema
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS notificaciones_sistema (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT,
+                usuario_nombre VARCHAR(255),
+                tipo VARCHAR(50) NOT NULL,
+                titulo VARCHAR(255) NOT NULL,
+                mensaje TEXT NOT NULL,
+                modulo VARCHAR(100),
+                accion VARCHAR(50),
+                referencia_id INT,
+                leida TINYINT(1) DEFAULT 0,
+                creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_usuario (usuario_id),
+                INDEX idx_leida (leida),
+                INDEX idx_creado (creado_en)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        
+        // Obtener notificaciones de pagos
+        $sqlPagos = "SELECT 
+                    id,
+                    usuario_nombre AS nombre,
+                    titulo,
+                    mensaje,
+                    tipo,
+                    modulo,
+                    accion,
+                    referencia_id,
+                    creado_en AS fecha_respuesta,
+                    'pago' AS tipo_notificacion,
+                    'Pago Realizado' AS tipo_solicitud,
+                    'Aprobado' AS estado
+                FROM notificaciones_sistema
+                WHERE modulo = 'pagos'
+                AND (usuario_id = :usuario_id OR usuario_id IS NULL)
+                ORDER BY creado_en DESC
+                LIMIT 50";
+        
+        $stmtPagos = $db->prepare($sqlPagos);
+        $stmtPagos->execute([':usuario_id' => $usuarioId]);
+        $notificacionesPagos = $stmtPagos->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Error obteniendo notificaciones de pagos: " . $e->getMessage());
+    }
+    
+    // Combinar todas las notificaciones
+    $notificaciones = array_merge($notificacionesSolicitudes, $notificacionesPagos);
+    
+    // Ordenar por fecha (más recientes primero)
+    usort($notificaciones, function($a, $b) {
+        $fechaA = $a['fecha_respuesta'] ?? $a['fecha_registro'] ?? $a['fecha'] ?? '1970-01-01';
+        $fechaB = $b['fecha_respuesta'] ?? $b['fecha_registro'] ?? $b['fecha'] ?? '1970-01-01';
+        return strtotime($fechaB) - strtotime($fechaA);
+    });
+    
+    // Limitar a 50 notificaciones
+    $notificaciones = array_slice($notificaciones, 0, 50);
+    
+} catch (PDOException $e) {
+    $errorConsulta = "Error de base de datos: " . $e->getMessage();
+    error_log('Error PDO en notificaciones: ' . $e->getMessage());
+} catch (Exception $e) {
+    $errorConsulta = "Error: " . $e->getMessage();
+    error_log('Error en notificaciones: ' . $e->getMessage());
+}
 ?>
 
-<main class="flex-1 p-8">
+<section class="w-full space-y-4">
   <h1 class="text-2xl font-bold mb-6 text-gray-800">Notificaciones</h1>
 
-<?php if (empty($notificaciones)): ?>
+<?php if ($errorConsulta): ?>
+  <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+    <p class="font-semibold">Error al cargar notificaciones:</p>
+    <p><?= htmlspecialchars($errorConsulta, ENT_QUOTES, 'UTF-8') ?></p>
+  </div>
+<?php elseif (empty($notificaciones)): ?>
 
   <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 text-center">
     <div class="text-gray-400 text-6xl mb-4">🔕</div>
@@ -25,7 +140,10 @@ $notificaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <?php else: ?>
 
-<?php foreach ($notificaciones as $notif): ?>
+<?php foreach ($notificaciones as $notif): 
+  $tipoNotif = $notif['tipo_notificacion'] ?? 'solicitud';
+  $esPago = ($tipoNotif === 'pago');
+?>
 <div class="mb-4">
 
 <?php if ($notif['estado'] == 'Rechazado'): ?>
@@ -37,19 +155,23 @@ $notificaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
   <div class="absolute right-5 top-5 text-red-500 text-xl font-bold">❌</div>
 
   <!-- RESUMEN -->
-  <p class="font-semibold text-gray-800">OF. Bienestar Estudiantil</p>
-  <span class="inline-block text-xs mt-2 bg-red-100 text-red-700 px-3 py-1 rounded-full">
-    Solicitud Rechazada
-  </span>
+  <div class="flex justify-between items-center">
+    <div>
+      <p class="font-semibold text-gray-800"><?= htmlspecialchars($notif['nombre'] ?? 'OF. Bienestar Estudiantil', ENT_QUOTES, 'UTF-8') ?></p>
+      <span class="inline-block text-xs mt-2 bg-red-100 text-red-700 px-3 py-1 rounded-full">
+        Solicitud Rechazada
+      </span>
+    </div>
+  </div>
 
   <!-- DETALLE -->
   <div class="detalle-notificacion hidden mt-4">
 
     <p class="text-gray-700 text-sm leading-relaxed mt-3">
-      Hola <span class="font-medium"><?= htmlspecialchars($notif['nombre_completo']) ?></span>,
+      Hola <span class="font-medium"><?= htmlspecialchars($notif['nombre'] ?? 'Usuario', ENT_QUOTES, 'UTF-8') ?></span>,
       su solicitud ha sido <span class="font-bold text-red-600">rechazada</span>
       <?php if (!empty($notif['motivo_respuesta'])): ?>
-        debido a que <?= htmlspecialchars($notif['motivo_respuesta']) ?>.
+        debido a que <?= htmlspecialchars($notif['motivo_respuesta'], ENT_QUOTES, 'UTF-8') ?>.
       <?php else: ?>
         por motivos administrativos.
       <?php endif; ?>
@@ -91,6 +213,40 @@ $notificaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </div> <!-- DETALLE -->
 </div> <!-- TARJETA -->
 
+<?php elseif ($esPago): ?>
+
+<!-- TARJETA PAGO REALIZADO -->
+<div onclick="toggleNotificacion(this)"
+     class="cursor-pointer bg-white rounded-2xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition">
+
+  <div class="flex justify-between items-center">
+    <div>
+      <p class="font-semibold text-gray-800"><?= htmlspecialchars($notif['nombre'] ?? $notif['usuario_nombre'] ?? 'Usuario', ENT_QUOTES, 'UTF-8') ?></p>
+      <span class="inline-block mt-2 bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">
+        Pago Realizado
+      </span>
+    </div>
+    <span class="text-green-500 text-xl font-bold">💰</span>
+  </div>
+
+  <div class="detalle-notificacion hidden mt-4">
+    <p class="text-gray-600 text-sm" style="white-space: pre-line;">
+      <?= htmlspecialchars($notif['titulo'] ?? 'Pago procesado', ENT_QUOTES, 'UTF-8') ?>
+    </p>
+    <?php if (!empty($notif['mensaje'])): ?>
+    <div class="mt-3 p-3 bg-green-50 rounded-lg">
+      <div class="text-sm text-gray-700"><?= $notif['mensaje'] ?></div>
+    </div>
+    <?php endif; ?>
+    <div class="mt-3">
+      <span class="inline-block bg-green-50 text-green-700 text-xs px-3 py-1 rounded-full">
+        <?= $notif['fecha_respuesta'] ? date('d/m/Y H:i', strtotime($notif['fecha_respuesta'])) : 'Hoy' ?>
+      </span>
+    </div>
+  </div>
+
+</div>
+
 <?php else: ?>
 
 <!-- TARJETA APROBADA -->
@@ -98,13 +254,14 @@ $notificaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
      class="cursor-pointer bg-white rounded-2xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition">
 
   <div class="flex justify-between items-center">
-    <p class="font-semibold text-gray-800"><?= htmlspecialchars($notif['nombre_completo']) ?></p>
+    <div>
+      <p class="font-semibold text-gray-800"><?= htmlspecialchars($notif['nombre'] ?? 'Usuario', ENT_QUOTES, 'UTF-8') ?></p>
+      <span class="inline-block mt-2 bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full">
+        Solicitud Aprobada
+      </span>
+    </div>
     <span class="text-blue-500 text-xl font-bold">✔️</span>
   </div>
-
-  <span class="inline-block mt-2 bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full">
-    Solicitud Aprobada
-  </span>
 
   <div class="detalle-notificacion hidden mt-4">
     <p class="text-gray-600 text-sm">
@@ -125,7 +282,7 @@ $notificaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </div>
 <?php endforeach; ?>
 <?php endif; ?>
-</main>
+</section>
 
 <!-- MODAL DE IMAGEN -->
 <div id="modalImagen" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">

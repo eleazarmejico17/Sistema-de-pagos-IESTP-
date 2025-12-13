@@ -26,12 +26,13 @@ try {
     // ✅ CONEXIÓN CORRECTA
     $db = Conexion::getInstance()->getConnection();
 
-    // VALIDAMOS ID
-    $check = $db->prepare("SELECT id FROM solicitud WHERE id = :id");
+    // VALIDAMOS ID en tabla 'resoluciones' (nuevo sistema)
+    $check = $db->prepare("SELECT id, creado_por FROM resoluciones WHERE id = :id");
     $check->execute([':id' => $id]);
     if ($check->rowCount() === 0) {
-        throw new Exception("Solicitud no encontrada");
+        throw new Exception("Resolución no encontrada");
     }
+    $resolucionData = $check->fetch(PDO::FETCH_ASSOC);
 
     // BUSCAR EMPLEADO SEGÚN SESIÓN
     $empleadoId = null;
@@ -49,12 +50,11 @@ try {
         }
     }
 
-    // CONSTRUIR CAMPOS
+    // CONSTRUIR CAMPOS para tabla 'solicitudes'
     $set = [
         'estado = :estado',
-        'motivo_respuesta = :motivo',
-        'fecha_respuesta = NOW()',
-        'notificacion_enviada = 1'
+        'observaciones = :motivo',
+        'fecha_revision = NOW()'
     ];
 
     $params = [
@@ -64,15 +64,20 @@ try {
     ];
 
     if ($empleadoId !== null) {
-        $set[] = 'empleado_id = :empleado_id';
+        $set[] = 'empleado = :empleado_id';
         $params[':empleado_id'] = $empleadoId;
     }
 
-    // ACTUALIZAR
-    $sql = "UPDATE solicitud SET " . implode(', ', $set) . " WHERE id = :id";
+    // ACTUALIZAR en tabla 'resoluciones' (nuevo sistema)
+    if ($estado === 'Aprobado' || $estado === 'aprobado' || $estado === 'APROBADO') {
+        $sql = "UPDATE resoluciones SET estado = true WHERE id = :id";
+    } else {
+        $sql = "UPDATE resoluciones SET estado = false WHERE id = :id";
+    }
     $stmt = $db->prepare($sql);
-    $stmt->execute($params);
+    $stmt->execute([':id' => $id]);
 
+    
     // INSERTAR HISTORIAL SI EXISTE EMPLEADO
     if ($empleadoId !== null) {
         $historial = $db->prepare("
@@ -88,56 +93,90 @@ try {
         ]);
     }
 
-    // CREAR TABLA NOTIFICACIONES SI NO EXISTE
-    $db->exec("
-        CREATE TABLE IF NOT EXISTS notificaciones (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            solicitud_id INT NOT NULL,
-            usuario_id INT,
-            mensaje TEXT NOT NULL,
-            tipo ENUM('Aprobado','Rechazado','Aviso') DEFAULT 'Aviso',
-            leido TINYINT(1) DEFAULT 0,
-            creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ");
-
-    // OBTENER SOLICITUD
-    $stmt = $db->prepare("SELECT correo FROM solicitud WHERE id = :id");
-    $stmt->execute([':id' => $id]);
-    $sol = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($sol && !empty($sol['correo'])) {
-        // BUSCAR ESTUDIANTE
-        $stmt = $db->prepare("
-            SELECT u.id FROM usuarios u
-            INNER JOIN roles r ON r.id = u.rol_id
-            WHERE u.correo = :correo AND r.nombre = 'usuario'
-            LIMIT 1
+    // CREAR NOTIFICACIÓN PARA BIENESTAR CON DATOS DE RESOLUCIÓN
+    try {
+        // Obtener información completa de la resolución para la notificación
+        $stmtNotif = $db->prepare("
+            SELECT r.id, r.numero_resolucion, r.titulo, r.texto_respaldo, 
+                   r.monto_descuento, r.fecha_inicio, r.fecha_fin, r.creado_en,
+                   r.ruta_documento, r.creado_por,
+                   emp.apnom_emp AS creador_nombre, emp.mailp_emp AS creador_correo
+            FROM resoluciones r
+            LEFT JOIN empleado emp ON emp.id = r.creado_por
+            WHERE r.id = :id
         ");
-        $stmt->execute([':correo' => $sol['correo']]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($user) {
-            $mensaje = "Su solicitud ha sido " . strtolower($estado);
-            if ($estado === 'Rechazado' && $motivo) {
-                $mensaje .= ". Motivo: " . $motivo;
+        $stmtNotif->execute([':id' => $id]);
+        $notifData = $stmtNotif->fetch(PDO::FETCH_ASSOC);
+        
+        if ($notifData) {
+            // Construir mensaje con datos específicos de la resolución
+            $mensajeNotificacion = "Resolución N° " . ($notifData['numero_resolucion'] ?: 'N/A') . "\n";
+            $mensajeNotificacion .= "Título: " . ($notifData['titulo'] ?: 'Sin título') . "\n";
+            $mensajeNotificacion .= "Creador: " . ($notifData['creador_nombre'] ?: 'No especificado') . "\n";
+            
+            if ($notifData['monto_descuento'] && $notifData['monto_descuento'] > 0) {
+                $mensajeNotificacion .= "Descuento: S/ " . number_format($notifData['monto_descuento'], 2) . "\n";
             }
-
-            $tipo = $estado === 'Aprobado' ? 'Aprobado' : 'Rechazado';
-
-            $stmt = $db->prepare("
-                INSERT INTO notificaciones 
-                (solicitud_id, usuario_id, mensaje, tipo)
-                VALUES (:sid, :uid, :msg, :tipo)
+            
+            if ($notifData['fecha_inicio'] && $notifData['fecha_fin']) {
+                $mensajeNotificacion .= "Vigencia: " . date('d/m/Y', strtotime($notifData['fecha_inicio'])) . 
+                                       " al " . date('d/m/Y', strtotime($notifData['fecha_fin'])) . "\n";
+            }
+            
+            if ($estado === 'Rechazado' && $motivo) {
+                $mensajeNotificacion .= "Motivo de rechazo: " . $motivo;
+            } else {
+                $mensajeNotificacion .= "Estado: " . $estado . " por Dirección";
+            }
+            
+            // Insertar en historial_solicitudes con información detallada
+            $historialNotif = $db->prepare("
+                INSERT INTO historial_solicitudes 
+                (solicitud_id, estado, empleado_id, comentarios, fecha_registro)
+                VALUES (:sid, :estado, :emp, :coment, NOW())
             ");
-
-            $stmt->execute([
-                ':sid'  => $id,
-                ':uid'  => $user['id'],
-                ':msg'  => $mensaje,
-                ':tipo' => $tipo
+            $historialNotif->execute([
+                ':sid'   => $id,
+                ':estado'=> $estado,
+                ':emp'   => $empleadoId,
+                ':coment'=> $mensajeNotificacion
             ]);
+            
+            // Crear notificación específica para bienestar
+            $notifBienestar = $db->prepare("
+                INSERT INTO notificaciones_bienestar 
+                (tipo, titulo, mensaje, id_resolucion, id_empleado_creador, estado_notificacion, creado_en)
+                VALUES (:tipo, :titulo, :mensaje, :id_res, :id_emp, 'no_leida', NOW())
+            ");
+            
+            $tipoNotif = ($estado === 'Aprobado' || $estado === 'aprobado' || $estado === 'APROBADO') ? 'aprobacion' : 'rechazo';
+            $tituloNotif = "Resolución " . (($estado === 'Aprobado' || $estado === 'aprobado' || $estado === 'APROBADO') ? 'Aprobada' : 'Rechazada');
+            $mensajeCorto = "La resolución N° " . ($notifData['numero_resolucion'] ?: 'N/A') . 
+                           " ha sido " . (($estado === 'Aprobado' || $estado === 'aprobado' || $estado === 'APROBADO') ? 'aprobada' : 'rechazada') . 
+                           " por Dirección.";
+            
+            // DEBUG: Verificar datos antes de insertar
+            error_log("=== DEBUG CREANDO NOTIFICACIÓN ===");
+            error_log("Tipo: " . $tipoNotif);
+            error_log("Título: " . $tituloNotif);
+            error_log("Mensaje: " . $mensajeCorto);
+            error_log("ID Resolución: " . $id);
+            error_log("ID Empleado Creador: " . $notifData['creado_por']);
+            
+            $result = $notifBienestar->execute([
+                ':tipo' => $tipoNotif,
+                ':titulo' => $tituloNotif,
+                ':mensaje' => $mensajeCorto,
+                ':id_res' => $id,
+                ':id_emp' => $notifData['creado_por']
+            ]);
+            
+            error_log("Resultado de inserción: " . ($result ? 'EXITOSO' : 'FALLIDO'));
+            error_log("ID de última inserción: " . $db->lastInsertId());
         }
+    } catch (Exception $e) {
+        error_log("Error creando notificación: " . $e->getMessage());
+        // No fallar el proceso principal si hay error en la notificación
     }
 
     echo json_encode([

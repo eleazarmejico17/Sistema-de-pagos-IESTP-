@@ -27,6 +27,16 @@ class EstudiantesController {
         return $est->create($post);
     }
 
+    public function obtener($id) {
+        $est = new Estudiantes();
+        return $est->getById($id);
+    }
+
+    public function actualizar($id, $post) {
+        $est = new Estudiantes();
+        return $est->update($id, $post);
+    }
+
     public function eliminar($id) {
         $est = new Estudiantes();
         return $est->delete($id);

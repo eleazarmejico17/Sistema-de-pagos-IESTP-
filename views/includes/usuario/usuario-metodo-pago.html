@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Método de Pago Profesional</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    .metodo-pago-option.selected {
+      border-color: #2563eb !important;
+      background-color: #eff6ff !important;
+    }
+    .metodo-pago-option.selected .metodo-pago-check {
+      border-color: #2563eb !important;
+    }
+    .metodo-pago-option.selected .metodo-pago-check > div {
+      display: block !important;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen font-sans">
 
@@ -20,40 +33,169 @@
           <div class="bg-gray-50 border rounded-2xl p-6 shadow-sm space-y-3">
               <p class="flex justify-between text-gray-700"><span>Concepto</span><span id="concept-name" class="font-medium">—</span></p>
               <p class="flex justify-between text-gray-700"><span>UIT</span><span id="uit-value" class="font-medium">0.00</span></p>
+              <p class="flex justify-between text-gray-700"><span>Valor UIT Unitario</span><span id="uit-unit-value" class="font-medium">S/ 5,150.00</span></p>
               <p class="flex justify-between text-gray-700"><span>Descuento</span><span id="discount-value" class="font-medium">S/ 0.00</span></p>
               <p class="flex justify-between font-semibold text-gray-800 text-lg border-t pt-3"><span>Total a Pagar</span><span id="total-amount">S/ 0.00</span></p>
             </div>
 
-          <div class="flex justify-center md:justify-start gap-4 mt-4">
-            <div class="border rounded-xl p-2 flex items-center justify-center hover:shadow-lg transition cursor-pointer">
-              <img src="assets/img/yape.png" alt="Yape" class="w-28 h-14 object-contain">
-            </div>
-            <div class="border rounded-xl p-2 flex items-center justify-center hover:shadow-lg transition cursor-pointer">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" alt="PayPal" class="w-28 h-14 object-contain">
-            </div>
-          </div>
         </div>
 
-        <!-- Formulario de pago -->
+        <!-- Selección de Método de Pago -->
         <div class="bg-gray-50 border rounded-3xl p-8 shadow-sm">
-          <h2 class="text-2xl font-bold text-gray-800 text-center mb-6">Datos de Pago</h2>
+          <h2 class="text-2xl font-bold text-gray-800 text-center mb-6">Selecciona Método de Pago</h2>
 
-          <form class="space-y-5">
-            <div>
-              <label class="block text-sm font-medium mb-2">Correo electrónico</label>
-              <input type="email" placeholder="correo@ejemplo.com" class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-blue-400 focus:outline-none shadow-sm transition">
+          <!-- Mensaje de error/success -->
+          <div id="mensaje-pago" class="hidden mb-4 p-4 rounded-lg"></div>
+
+          <form id="form-pago" class="space-y-6">
+            <!-- Métodos de pago seleccionables -->
+            <div class="space-y-4">
+              <label class="block text-sm font-medium mb-3 text-gray-700 text-center">Elige tu método de pago preferido</label>
+              
+              <div class="grid grid-cols-1 gap-4">
+                <!-- Opción Yape -->
+                <label class="metodo-pago-option relative flex items-center p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all" data-metodo="yape">
+                  <input 
+                    type="radio" 
+                    name="metodo_pago" 
+                    value="yape" 
+                    class="sr-only"
+                    required>
+                  <div class="flex items-center gap-4 w-full">
+                    <div class="flex-shrink-0">
+                      <img src="../../assets/img/yape.png" alt="Yape" class="w-20 h-12 object-contain" onerror="this.style.display='none'">
+                    </div>
+                    <div class="flex-1">
+                      <span class="font-semibold text-gray-800">Yape</span>
+                      <p class="text-sm text-gray-600">Pago móvil rápido y seguro</p>
+                    </div>
+                    <div class="flex-shrink-0">
+                      <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center metodo-pago-check">
+                        <div class="w-3 h-3 bg-blue-600 rounded-full hidden"></div>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <!-- Opción Plin -->
+                <label class="metodo-pago-option relative flex items-center p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all" data-metodo="plin">
+                  <input 
+                    type="radio" 
+                    name="metodo_pago" 
+                    value="plin" 
+                    class="sr-only"
+                    required>
+                  <div class="flex items-center gap-4 w-full">
+                    <div class="flex-shrink-0">
+                      <img src="../../assets/img/plin.png" alt="Plin" class="w-20 h-12 object-contain" onerror="this.style.display='none'">
+                    </div>
+                    <div class="flex-1">
+                      <span class="font-semibold text-gray-800">Plin</span>
+                      <p class="text-sm text-gray-600">Pago móvil bancario</p>
+                    </div>
+                    <div class="flex-shrink-0">
+                      <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center metodo-pago-check">
+                        <div class="w-3 h-3 bg-blue-600 rounded-full hidden"></div>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <!-- Opción Transferencia -->
+                <label class="metodo-pago-option relative flex items-center p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all" data-metodo="transferencia">
+                  <input 
+                    type="radio" 
+                    name="metodo_pago" 
+                    value="transferencia" 
+                    class="sr-only"
+                    required>
+                  <div class="flex items-center gap-4 w-full">
+                    <div class="flex-shrink-0">
+                      <div class="w-20 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-exchange-alt text-white text-2xl"></i>
+                      </div>
+                    </div>
+                    <div class="flex-1">
+                      <span class="font-semibold text-gray-800">Transferencia Bancaria</span>
+                      <p class="text-sm text-gray-600">Transferencia electrónica</p>
+                    </div>
+                    <div class="flex-shrink-0">
+                      <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center metodo-pago-check">
+                        <div class="w-3 h-3 bg-blue-600 rounded-full hidden"></div>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <!-- Opción Depósito -->
+                <label class="metodo-pago-option relative flex items-center p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all" data-metodo="deposito">
+                  <input 
+                    type="radio" 
+                    name="metodo_pago" 
+                    value="deposito" 
+                    class="sr-only"
+                    required>
+                  <div class="flex items-center gap-4 w-full">
+                    <div class="flex-shrink-0">
+                      <div class="w-20 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-building text-white text-2xl"></i>
+                      </div>
+                    </div>
+                    <div class="flex-1">
+                      <span class="font-semibold text-gray-800">Depósito en Banco</span>
+                      <p class="text-sm text-gray-600">Pago en cuenta bancaria</p>
+                    </div>
+                    <div class="flex-shrink-0">
+                      <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center metodo-pago-check">
+                        <div class="w-3 h-3 bg-blue-600 rounded-full hidden"></div>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <!-- Opción Efectivo -->
+                <label class="metodo-pago-option relative flex items-center p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all" data-metodo="efectivo">
+                  <input 
+                    type="radio" 
+                    name="metodo_pago" 
+                    value="efectivo" 
+                    class="sr-only"
+                    required>
+                  <div class="flex items-center gap-4 w-full">
+                    <div class="flex-shrink-0">
+                      <div class="w-20 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-money-bill-wave text-white text-2xl"></i>
+                      </div>
+                    </div>
+                    <div class="flex-1">
+                      <span class="font-semibold text-gray-800">Efectivo</span>
+                      <p class="text-sm text-gray-600">Pago físico directo</p>
+                    </div>
+                    <div class="flex-shrink-0">
+                      <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center metodo-pago-check">
+                        <div class="w-3 h-3 bg-blue-600 rounded-full hidden"></div>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              </div>
             </div>
-            <div>
-              <label class="block text-sm font-medium mb-2">Contraseña</label>
-              <input type="password" placeholder="••••••••" class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-blue-400 focus:outline-none shadow-sm transition">
-            </div>
-            <button id="pay-button" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold px-6 py-3 rounded-xl w-full mt-4 transition shadow-md hover:shadow-lg">
-              Pagar: <span id="pay-amount">S/ 0.00</span>
+
+            <button 
+              type="submit"
+              id="pay-button" 
+              class="bg-blue-700 hover:bg-blue-800 text-white font-semibold px-6 py-3 rounded-xl w-full mt-4 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2">
+              <span id="pay-button-text">
+                <i class="fas fa-credit-card"></i> Pagar: <span id="pay-amount">S/ 0.00</span>
+              </span>
+              <span id="pay-button-loading" class="hidden">
+                <i class="fas fa-spinner fa-spin"></i> Procesando...
+              </span>
             </button>
           </form>
 
           <p class="text-gray-500 text-sm text-center mt-6">
-            Al continuar, aceptas nuestros <a href="#" class="text-blue-600 underline">Términos y Condiciones</a> y <a href="#" class="text-blue-600 underline">Política de Privacidad</a>.
+            Al continuar, aceptas nuestros <a href="#" class="text-blue-600 underline hover:text-blue-800">Términos y Condiciones</a> y <a href="#" class="text-blue-600 underline hover:text-blue-800">Política de Privacidad</a>.
           </p>
         </div>
 
@@ -65,29 +207,167 @@
 </body>
 <script>
   (function(){
+    // Valor UIT en soles (debe coincidir con el valor en pagos.php)
+    const VALOR_UIT_SOLES = 5150.00;
+    
     const params = new URLSearchParams(window.location.search);
-    const concept = params.get('concept') || '';
-    const uit = params.get('uit') || '';
-    // Si existe un parámetro 'amount' úsalo, si no, por defecto usamos el valor de UIT
-    const amount = params.get('amount') || uit || '0.00';
+    const concept = params.get('concept') || params.get('nombre') || '';
+    const descripcion = params.get('descripcion') || '';
+    const uit = parseFloat(params.get('uit')) || 0;
+    
+    // SIEMPRE calcular el monto desde el UIT: UIT * VALOR_UIT_SOLES
+    // Ignorar el parámetro amount y calcular siempre desde el UIT para asegurar consistencia
+    const amount = (uit * VALOR_UIT_SOLES).toFixed(2);
 
     const elConcept = document.getElementById('concept-name');
     const elUit = document.getElementById('uit-value');
+    const elUitUnit = document.getElementById('uit-unit-value');
     const elTotal = document.getElementById('total-amount');
     const elPayAmount = document.getElementById('pay-amount');
 
-    if(elConcept) elConcept.textContent = concept || '—';
-    if(elUit) elUit.textContent = uit || '0.00';
+    if(elConcept) elConcept.textContent = descripcion || concept || '—';
+    if(elUit) elUit.textContent = uit.toFixed(2) || '0.00';
+    if(elUitUnit) {
+      // Formatear el valor unitario de la UIT con separador de miles
+      const uitUnitFormatted = VALOR_UIT_SOLES.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      elUitUnit.textContent = 'S/ ' + uitUnitFormatted;
+    }
 
-    // Formatea y muestra el monto (asumimos que el valor recibido ya está en formato numérico o con decimales)
-    const formatted = (value => {
-      // Asegurar que tenga dos decimales
-      const n = Number(String(value).replace(/[^0-9.-]+/g, '')) || 0;
-      return 'S/ ' + n.toFixed(2);
-    })(amount);
+    // Formatea y muestra el monto total calculado
+    const montoTotal = parseFloat(amount);
+    const formatted = 'S/ ' + montoTotal.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     if(elTotal) elTotal.textContent = formatted;
     if(elPayAmount) elPayAmount.textContent = formatted;
+
+    // Manejar envío del formulario de pago
+    const formPago = document.getElementById('form-pago');
+    const mensajePago = document.getElementById('mensaje-pago');
+    const payButton = document.getElementById('pay-button');
+    const payButtonText = document.getElementById('pay-button-text');
+    const payButtonLoading = document.getElementById('pay-button-loading');
+
+    function mostrarMensaje(texto, tipo = 'error') {
+      mensajePago.className = `mb-4 p-4 rounded-lg ${tipo === 'error' ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`;
+      mensajePago.innerHTML = `<i class="fas ${tipo === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} mr-2"></i>${texto}`;
+      mensajePago.classList.remove('hidden');
+    }
+
+    function ocultarMensaje() {
+      mensajePago.classList.add('hidden');
+    }
+
+    // Manejar selección de método de pago
+    const metodoOptions = document.querySelectorAll('.metodo-pago-option');
+    metodoOptions.forEach(option => {
+      const radio = option.querySelector('input[type="radio"]');
+      
+      // Actualizar visual cuando el radio cambia
+      radio.addEventListener('change', function() {
+        metodoOptions.forEach(opt => {
+          opt.classList.remove('selected');
+          const check = opt.querySelector('.metodo-pago-check > div');
+          if (check) check.classList.add('hidden');
+        });
+        
+        if (radio.checked) {
+          option.classList.add('selected');
+          const check = option.querySelector('.metodo-pago-check > div');
+          if (check) check.classList.remove('hidden');
+        }
+      });
+      
+      // Permitir click en toda la opción
+      option.addEventListener('click', function(e) {
+        if (e.target.tagName !== 'INPUT') {
+          radio.checked = true;
+          radio.dispatchEvent(new Event('change'));
+        }
+      });
+    });
+
+    if (formPago) {
+      formPago.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        ocultarMensaje();
+
+        const metodoPago = document.querySelector('input[name="metodo_pago"]:checked');
+        // Calcular el monto siempre desde el UIT (fuente de verdad)
+        const uitValue = parseFloat(params.get('uit')) || 0;
+        const monto = (uitValue * VALOR_UIT_SOLES);
+
+        // Validaciones
+        if (!metodoPago) {
+          mostrarMensaje('Por favor, selecciona un método de pago', 'error');
+          return;
+        }
+
+        if (monto <= 0) {
+          mostrarMensaje('El monto debe ser mayor a cero', 'error');
+          return;
+        }
+
+        // Deshabilitar botón y mostrar loading
+        payButton.disabled = true;
+        payButtonText.classList.add('hidden');
+        payButtonLoading.classList.remove('hidden');
+
+        // Determinar ruta del controlador
+        const currentPath = window.location.pathname;
+        let baseUrl = '';
+        if (currentPath.includes('/views/')) {
+          baseUrl = currentPath.substring(0, currentPath.indexOf('/views/'));
+        }
+
+        try {
+          // Obtener el concepto desde los parámetros de la URL
+          const urlParams = new URLSearchParams(window.location.search);
+          const conceptoPago = urlParams.get('descripcion') || urlParams.get('concept') || urlParams.get('nombre') || concept || 'Pago de servicio';
+          const tipoPagoId = urlParams.get('id') || '';
+          const numero = urlParams.get('concept') || '';
+          const uit = urlParams.get('uit') || '';
+          
+          const response = await fetch(baseUrl + '/controller/procesarPago.php', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              concepto: conceptoPago,
+              monto: monto,
+              metodo_pago: metodoPago.value,
+              tipo_pago_id: tipoPagoId,
+              numero: numero,
+              uit: uit
+            })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            mostrarMensaje(data.message || 'Pago procesado correctamente. Redirigiendo...', 'success');
+            setTimeout(() => {
+              if (data.redirect) {
+                window.location.href = data.redirect;
+              } else {
+                window.location.href = '../dashboard-usuario.php?pagina=comprobantes';
+              }
+            }, 2000);
+          } else {
+            mostrarMensaje(data.error || 'Error al procesar el pago', 'error');
+            payButton.disabled = false;
+            payButtonText.classList.remove('hidden');
+            payButtonLoading.classList.add('hidden');
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          mostrarMensaje('Error de conexión. Por favor, intente nuevamente.', 'error');
+          payButton.disabled = false;
+          payButtonText.classList.remove('hidden');
+          payButtonLoading.classList.add('hidden');
+        }
+      });
+    }
   })();
 </script>
 </html>

@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -89,7 +90,7 @@
 
           <p class="mt-6 text-lg md:text-xl bg-[#CCA831] inline-block text-black px-4 py-3 rounded-2xl shadow-lg font-medium">
             Apoyo económico institucional para facilitar la continuidad académica
-          </p>.
+          </p>
 
           <div class="mt-6 text-sm md:text-base bg-white bg-opacity-90 text-gray-800 p-6 rounded-2xl shadow-lg">
             <p class="mb-3">

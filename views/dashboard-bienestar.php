@@ -1,6 +1,105 @@
 <?php
+session_start();
+
+// Validar autenticación y rol
+if (!isset($_SESSION['usuario']) || !isset($_SESSION['rol'])) {
+    header('Location: ../public/login.html');
+    exit;
+}
+
+// Validar que el rol sea 'bienestar'
+if ($_SESSION['rol'] !== 'bienestar') {
+    header('Location: ../errors/403.html');
+    exit;
+}
+
+// Procesar formularios si se envían (ANTES de cualquier output HTML)
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once __DIR__ . '/../controller/bienestar-registroController.php';
+    $ctrl = new BienestarRegistroController();
+    
+    $accion = $_POST['accion'] ?? '';
+    
+    // Procesar formulario de resolución
+    if ($accion === 'agregar_resolucion') {
+        try {
+            $data = [
+                'numero_resolucion' => trim($_POST['numero_resolucion'] ?? ''),
+                'titulo' => trim($_POST['titulo'] ?? ''),
+                'texto_respaldo' => trim($_POST['texto_respaldo'] ?? ''),
+                'fecha_inicio' => $_POST['fecha_inicio'] ?? null,
+                'fecha_fin' => $_POST['fecha_fin'] ?? null,
+            ];
+            
+            // Validaciones básicas
+            if (empty($data['numero_resolucion']) || empty($data['titulo']) || empty($data['fecha_inicio'])) {
+                throw new Exception('Los campos obligatorios deben ser completados.');
+            }
+            
+            $result = $ctrl->crearResolucion($data, $_FILES);
+            
+            if ($result) {
+                header('Location: dashboard-bienestar.php?pagina=registro-bienestar-estudiantil&status=resolucion_created');
+                exit;
+            } else {
+                throw new Exception('No se pudo crear la resolución.');
+            }
+        } catch (Exception $e) {
+            $_SESSION['bienestar_errors'] = [$e->getMessage()];
+            $_SESSION['bienestar_previous_data'] = $_POST;
+            header('Location: dashboard-bienestar.php?pagina=registro-bienestar-estudiantil&status=error');
+            exit;
+        }
+    }
+    
+    // Procesar formulario de beneficiario
+    if ($accion === 'agregar_beneficiario') {
+        try {
+            $dni = trim($_POST['dni'] ?? '');
+            
+            // Buscar estudiante por DNI
+            $estudiante = $ctrl->buscarEstudiante($dni);
+            
+            if (!$estudiante || !isset($estudiante['id'])) {
+                throw new Exception('No se encontró un estudiante con ese DNI. Por favor, busca primero al estudiante.');
+            }
+            
+            $data = [
+                'estudiante_id' => $estudiante['id'],
+                'resolucion_id' => $_POST['resolucion_id'] ?? null,
+                'porcentaje_descuento' => $_POST['porcentaje_descuento'] ?? null,
+                'fecha_inicio' => $_POST['fecha_inicio'] ?? null,
+                'fecha_fin' => $_POST['fecha_fin'] ?? null,
+                'activo' => 1
+            ];
+            
+            // Validaciones básicas
+            if (empty($data['resolucion_id']) || empty($data['porcentaje_descuento'])) {
+                throw new Exception('Los campos obligatorios deben ser completados.');
+            }
+            
+            $result = $ctrl->crearBeneficiario($data);
+            
+            if ($result) {
+                header('Location: dashboard-bienestar.php?pagina=registro-bienestar-estudiantil&status=beneficiario_created');
+                exit;
+            } else {
+                throw new Exception('No se pudo crear el beneficiario.');
+            }
+        } catch (Exception $e) {
+            $_SESSION['bienestar_errors'] = [$e->getMessage()];
+            $_SESSION['bienestar_previous_data'] = $_POST;
+            header('Location: dashboard-bienestar.php?pagina=registro-bienestar-estudiantil&status=error');
+            exit;
+        }
+    }
+}
+
 // Página actual
 $pagina = isset($_GET['pagina']) ? $_GET['pagina'] : 'registro-bienestar-estudiantil';
+
+// Permitir acceso a reportes-bienestar-estudiantil para admin y bienestar
+// (bienestar solo puede ver, no puede hacer acciones)
 
 // Definir título e icono Font Awesome según página
 switch($pagina){
@@ -17,6 +116,11 @@ switch($pagina){
     case 'solicitud-bienestar-estudiantil':   // ← CORREGIDO (sin .html)
         $titulo = 'SOLICITUDES';
         $icono  = 'fa-file-alt';
+        break;
+
+    case 'notificaciones-bienestar':
+        $titulo = 'NOTIFICACIONES';
+        $icono  = 'fa-bell';
         break;
 
     default:
@@ -86,7 +190,7 @@ function activo($id, $pagina){
 
         <!-- LOGO -->
         <div class="flex flex-col items-center pt-10 pb-4">
-            <img src="assets/img/logo1.png" class="w-28 h-28 rounded-full shadow-lg animate-float">
+            <img src="assets/img/logo1.png" alt="Logo" class="w-28 h-28 rounded-full shadow-lg animate-float">
             <div class="mt-3 flex items-center gap-2">
                 <span class="relative flex h-3 w-3">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -116,13 +220,18 @@ function activo($id, $pagina){
                 <i class="fas fa-file-alt text-xl"></i> SOLICITUDES
             </button>
 
+            <button onclick="window.location='?pagina=notificaciones-bienestar'"
+                class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold <?= activo('notificaciones-bienestar', $pagina) ?>">
+                <i class="fas fa-bell text-xl"></i> NOTIFICACIONES
+            </button>
+
         </nav>
 
         <div class="flex-1"></div>
 
         <!-- SALIR -->
         <div class="p-6">
-            <a href="/Sistema-de-pagos-IESTP/public/logout.php">
+            <a href="../public/logout.php">
                 <button class="w-full bg-gradient-to-r from-red-500 to-red-600 py-3 rounded-2xl font-semibold text-white">
                     <i class="fas fa-sign-out-alt"></i> SALIR
                 </button>

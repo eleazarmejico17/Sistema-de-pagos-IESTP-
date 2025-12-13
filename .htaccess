@@ -1,8 +1,0 @@
-RewriteEngine On 
-
-<Files .env>
-    Order allow,deny
-    Deny from all
-</Files>
-
-ErrorDocument 404 /errors/404.html

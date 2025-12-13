@@ -8,7 +8,6 @@ $pagina = $_GET['pagina'] ?? 'usuario-solicitud';
 $menu = [
   'usuario-solicitud'   => ['icon' => 'fa-plus', 'texto' => 'NUEVO'],
   'notificaciones'      => ['icon' => 'fa-bell', 'texto' => 'NOTIFICACIONES'],
-  'usuario-metodo-pago' => ['icon' => 'fa-credit-card', 'texto' => 'MÉTODO DE PAGO'],
   'pagos'               => ['icon' => 'fa-file-invoice', 'texto' => 'PAGOS'],
   'comprobantes'        => ['icon' => 'fa-folder', 'texto' => 'COMPROBANTES']
 ];
@@ -104,7 +103,7 @@ function activo($id, $pagina){
 
     <!-- BOTÓN SALIR -->
     <div class="p-6">
-      <a href="/Sistema-de-pagos-IESTP/public/logout.php">
+      <a href="../public/logout.php">
         <button 
           class="relative w-full flex items-center justify-center gap-3 px-4 py-3 font-semibold rounded-2xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-[0_0_25px_rgba(239,68,68,0.5)] transition-all duration-500 overflow-hidden group">
             <i class="fas fa-sign-out-alt text-xl group-hover:-translate-x-1 transition-transform duration-300"></i>

@@ -17,28 +17,42 @@ class GuardarSolicitudController {
         try {
 
             if (
+                empty($datos['dni']) ||
                 empty($datos['nombre']) ||
                 empty($datos['telefono']) ||
-                empty($datos['tipo']) ||
+                empty($datos['tipo']) || // id de resolución seleccionada
                 empty($datos['fecha']) ||
                 empty($datos['descripcion'])
             ) {
                 throw new Exception("Campos incompletos");
             }
 
+            // Buscar ID de estudiante por DNI
+            $stmtEst = $this->db->prepare("SELECT id FROM estudiante WHERE dni_est = :dni LIMIT 1");
+            $stmtEst->execute([':dni' => trim($datos['dni'])]);
+            $est = $stmtEst->fetch(PDO::FETCH_ASSOC);
+
+            if (!$est) {
+                throw new Exception("No se encontró un estudiante con ese DNI");
+            }
+
+            $estudianteId = (int)$est['id'];
+
+            // Archivos de evidencia (se guardan en columna foto)
             $archivos = $this->subirArchivos();
 
-            $sql = "INSERT INTO solicitud 
-                    (nombre, telefono, tipo_solicitud, descripcion, archivos, fecha, fecha_registro)
-                    VALUES (:nombre, :telefono, :tipo, :descripcion, :archivos, :fecha, NOW())";
+            // Insertar en tabla 'solicitudes' (plural), acorde a tu script SQL
+            $sql = "INSERT INTO solicitudes 
+                    (estudiante, resoluciones, tipo_solicitud, descripcion, estado, fecha_solicitud, observaciones, foto)
+                    VALUES (:estudiante, :resoluciones, :tipo_solicitud, :descripcion, 'pendiente', :fecha_solicitud, NULL, :foto)";
 
             $params = [
-                ':nombre' => trim($datos['nombre']),
-                ':telefono' => trim($datos['telefono']),
-                ':tipo' => trim($datos['tipo']),
-                ':descripcion' => trim($datos['descripcion']),
-                ':archivos' => $archivos,
-                ':fecha' => $datos['fecha']
+                ':estudiante'      => $estudianteId,
+                ':resoluciones'    => (int)$datos['tipo'], // id de la resolución seleccionada
+                ':tipo_solicitud'  => 'Descuento',         // etiqueta general, puedes cambiarla luego
+                ':descripcion'     => trim($datos['descripcion']),
+                ':fecha_solicitud' => $datos['fecha'],
+                ':foto'            => $archivos
             ];
 
             $stmt = $this->db->prepare($sql);
