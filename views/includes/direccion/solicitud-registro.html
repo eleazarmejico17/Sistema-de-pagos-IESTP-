@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solicitud de Registro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex bg-gray-100 min-h-screen">
+
+   <aside class="w-64 bg-[#0B1221] text-white flex flex-col justify-between">
+    <div>
+      <!-- Logo -->
+      <div class="flex flex-col items-center py-6 border-b border-gray-700">
+        <img src="img/logo.png"alt="Logo" class="w-20 h-20 mb-2">
+        <h2 class="text-center text-sm font-semibold tracking-wide">IESTP - AACD</h2>
+      </div>
+
+      <!-- Menú -->
+      <nav class="mt-8 flex flex-col space-y-3 px-4">
+        <a href="#" class="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-gray-800 transition">
+          <span>➕</span><span>NUEVO</span>
+        </a>
+        <a href="#" class="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-gray-800 transition">
+          <span>📊</span><span>REPORTES</span>
+        </a>
+        <a href="#" class="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-gray-800 transition">
+          <span>📄</span><span>SOLICITUDES</span>
+        </a>
+      </nav>
+    </div>
+  </aside>
+
+
+  <!-- Contenido principal -->
+  <main class="flex-1">
+    <!-- Encabezado -->
+    <header class="bg-cover bg-center h-40 relative" style="background-image: url('img/img-background.jpeg');">
+      <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="flex items-center space-x-3">
+          <span class="text-3xl text-white">＋</span>
+          <h1 class="text-3xl text-white font-bold">SOLICITUD DE REGISTRO</h1>
+        </div>
+      </div>
+    </header>
+
+    <!-- Tarjeta de notificación -->
+    <section class="p-8 space-y-6">
+      <div class="border border-red-300 rounded-lg bg-white p-5 shadow-sm relative">
+        <div class="absolute right-4 top-3 text-black text-xl font-bold">▲</div>
+        <p class="font-semibold text-sm text-gray-800">OF. Bien estar estudiantil</p>
+        <p class="text-gray-700 mt-2 text-sm">
+          Hola Eleazar Natanael Mejico de la Cruz, desafortunadamente hemos desestimado su solicitud debido a que los motivos y evidencias presentadas son de años posteriores al correspondiente, por ende su solicitud fue rechazada.
+        </p>
+
+        <div class="mt-4">
+          <p class="font-semibold text-gray-700 text-sm">Resolución solicitada</p>
+          <span class="inline-block bg-green-300 text-green-900 text-xs font-semibold px-3 py-1 rounded mt-1">N°202602 Deportista D.</span>
+        </div>
+
+        <div class="mt-4">
+          <p class="font-semibold text-gray-700 text-sm mb-2">Evidencias</p>
+          <div class="flex space-x-3">
+            <div class="bg-gray-100 w-24 h-16 flex items-center justify-center border rounded">
+              <span class="text-gray-400 text-xl">🖼️</span>
+            </div>
+            <div class="bg-gray-100 w-24 h-16 flex items-center justify-center border rounded">
+              <span class="text-gray-400 text-xl">🖼️</span>
+            </div>
+            <div class="bg-gray-100 w-24 h-16 flex items-center justify-center border rounded">
+              <span class="text-gray-400 text-xl">🖼️</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Segunda notificación -->
+      <div class="border border-blue-800 rounded-lg bg-white p-5 shadow-sm flex justify-between items-center">
+        <p class="font-semibold text-gray-800 text-sm">MEJICO DE LA CRUZ Eleazar Natanael</p>
+        <div class="flex items-center space-x-3">
+          <span class="bg-blue-900 text-white text-xs font-semibold px-3 py-1 rounded">N°202602 Pago de trámite exitoso</span>
+          <span class="text-black text-xl font-bold">▼</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>

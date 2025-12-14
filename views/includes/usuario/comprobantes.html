@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comprobantes - IESTP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body class="min-h-screen bg-gray-100 flex justify-center">
+
+  <main class="flex-1 p-10 max-w-7xl">
+    <h1 class="text-3xl font-bold mb-8 text-gray-800">Comprobantes</h1>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7">
+
+      <!-- CARD - MATRÍCULA -->
+      <div class="card bg-white shadow-lg rounded-xl overflow-hidden border hover:shadow-2xl transition hover:-translate-y-1">
+        <div class="flex">
+          <div class="w-2 bg-blue-700"></div>
+
+          <div class="p-5 flex-1">
+            <h3 class="text-xl font-bold text-gray-800 mb-3">Matrícula</h3>
+
+            <div class="space-y-1 text-gray-700 text-sm">
+              <p><strong>Cód Estudiante:</strong> 7984219838</p>
+              <p><strong>Alumno:</strong> Mejico de la cruz Eleazar Natanel</p>
+              <p><strong>DNI:</strong> 73145710</p>
+              <p><strong>Estado:</strong> <span class="text-green-600 font-semibold">PAGADO</span></p>
+            </div>
+
+            <div class="flex justify-between mt-5">
+              <button 
+                onclick="openModal({
+                  titulo: 'Matrícula',
+                  codigo: '7984219838',
+                  alumno: 'Mejico de la cruz Eleazar Natanel',
+                  dni: '73145710',
+                  estado: 'PAGADO',
+                  fecha: '12/03/2025',
+                  monto: 'S/ 120.00',
+                  tipo: 'Recibo de Ingreso',
+                  serie: 'MTR-2025',
+                  numero: '000123',
+                  descripcion: 'Pago por concepto de matrícula anual para el periodo académico 2025.'
+                })"
+                class="px-4 py-2 border border-blue-700 text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition">
+                Ver
+              </button>
+
+              <button 
+                onclick="descargarComprobante('Matrícula', '7984219838', 'MTR-2025', '000123')"
+                class="px-4 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800 transition flex items-center gap-2">
+                <i class="fas fa-download"></i> Descargar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD - CARNET -->
+      <div class="card bg-white shadow-lg rounded-xl overflow-hidden border hover:shadow-2xl transition hover:-translate-y-1">
+        <div class="flex">
+          <div class="w-2 bg-red-600"></div>
+
+          <div class="p-5 flex-1">
+            <h3 class="text-xl font-bold text-gray-800 mb-3">Carnet Medio Pasaje</h3>
+
+            <div class="space-y-1 text-gray-700 text-sm">
+              <p><strong>Cód Estudiante:</strong> 7984219838</p>
+              <p><strong>Alumno:</strong> Mejico de la cruz Eleazar Natanel</p>
+              <p><strong>DNI:</strong> 73145710</p>
+              <p><strong>Estado:</strong> <span class="text-green-600 font-semibold">PAGADO</span></p>
+            </div>
+
+            <div class="flex justify-between mt-5">
+              <button 
+                onclick="openModal({
+                  titulo: 'Carnet Medio Pasaje',
+                  codigo: '7984219838',
+                  alumno: 'Mejico de la cruz Eleazar Natanel',
+                  dni: '73145710',
+                  estado: 'PAGADO',
+                  fecha: '18/04/2025',
+                  monto: 'S/ 25.00',
+                  tipo: 'Recibo de Ingreso',
+                  serie: 'CMP-2025',
+                  numero: '000456',
+                  descripcion: 'Pago por emisión de carnet de medio pasaje para transporte público.'
+                })"
+                class="px-4 py-2 border border-red-600 text-red-600 rounded-lg font-medium hover:bg-red-50 transition">
+                Ver
+              </button>
+
+              <button 
+                onclick="descargarComprobante('Carnet Medio Pasaje', '7984219838', 'CMP-2025', '000456')"
+                class="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition flex items-center gap-2">
+                <i class="fas fa-download"></i> Descargar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD - FOLDER -->
+      <div class="card bg-white shadow-lg rounded-xl overflow-hidden border hover:shadow-2xl transition hover:-translate-y-1">
+        <div class="flex">
+          <div class="w-2 bg-lime-500"></div>
+
+          <div class="p-5 flex-1">
+            <h3 class="text-xl font-bold text-gray-800 mb-3">Folder de Prácticas</h3>
+
+            <div class="space-y-1 text-gray-700 text-sm">
+              <p><strong>Cód Estudiante:</strong> 7984219838</p>
+              <p><strong>Alumno:</strong> Mejico de la cruz Eleazar Natanel</p>
+              <p><strong>DNI:</strong> 73145710</p>
+              <p><strong>Estado:</strong> <span class="text-green-600 font-semibold">PAGADO</span></p>
+            </div>
+
+            <div class="flex justify-between mt-5">
+              <button 
+                onclick="openModal({
+                  titulo: 'Folder de Prácticas',
+                  codigo: '7984219838',
+                  alumno: 'Mejico de la cruz Eleazar Natanel',
+                  dni: '73145710',
+                  estado: 'PAGADO',
+                  fecha: '05/06/2025',
+                  monto: 'S/ 15.00',
+                  tipo: 'Voucher de Pago',
+                  serie: 'FDP-2025',
+                  numero: '000789',
+                  descripcion: 'Pago por adquisición del folder institucional para prácticas preprofesionales.'
+                })"
+                class="px-4 py-2 border border-lime-500 text-lime-600 rounded-lg font-medium hover:bg-lime-50 transition">
+                Ver
+              </button>
+
+              <button 
+                onclick="descargarComprobante('Folder de Prácticas', '7984219838', 'FDP-2025', '000789')"
+                class="px-4 py-2 bg-lime-500 text-white rounded-lg font-medium hover:bg-lime-600 transition flex items-center gap-2">
+                <i class="fas fa-download"></i> Descargar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- === MODAL SUPER DETALLADO === -->
+  <div id="modal" class="fixed inset-0 hidden bg-black bg-opacity-40 flex justify-center items-center backdrop-blur-sm p-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl p-6 animate-fadeIn border border-gray-200">
+
+      <h2 id="modalTitulo" class="text-2xl font-bold mb-4 flex items-center gap-2">
+        <i class="fa-solid fa-file-invoice text-blue-600"></i>
+      </h2>
+
+      <!-- INFO GENERAL -->
+      <div class="mb-4">
+        <h3 class="font-semibold text-gray-700 mb-2">📌 Información del Estudiante</h3>
+        <div class="bg-gray-50 p-3 rounded-lg border">
+          <p><strong>Código:</strong> <span id="modalCodigo"></span></p>
+          <p><strong>Alumno:</strong> <span id="modalAlumno"></span></p>
+          <p><strong>DNI:</strong> <span id="modalDni"></span></p>
+        </div>
+      </div>
+
+      <!-- COMPROBANTE -->
+      <div class="mb-4">
+        <h3 class="font-semibold text-gray-700 mb-2">🧾 Información del Comprobante</h3>
+        <div class="bg-gray-50 p-3 rounded-lg border grid grid-cols-2 gap-2 text-sm">
+          <p><strong>Tipo:</strong> <span id="modalTipo"></span></p>
+          <p><strong>Serie:</strong> <span id="modalSerie"></span></p>
+          <p><strong>Número:</strong> <span id="modalNumero"></span></p>
+          <p><strong>Fecha:</strong> <span id="modalFecha"></span></p>
+        </div>
+      </div>
+
+      <!-- PAGO -->
+      <div class="mb-4">
+        <h3 class="font-semibold text-gray-700 mb-2">💰 Información del Pago</h3>
+        <div class="bg-gray-50 p-3 rounded-lg border">
+          <p><strong>Monto:</strong> <span id="modalMonto" class="font-semibold text-green-600"></span></p>
+          <p><strong>Estado:</strong> <span id="modalEstado" class="font-semibold"></span></p>
+        </div>
+      </div>
+
+      <!-- DESCRIPCION -->
+      <div class="mb-4">
+        <h3 class="font-semibold text-gray-700 mb-2">📝 Descripción del Servicio</h3>
+        <div class="bg-gray-50 p-3 rounded-lg border text-sm">
+          <p id="modalDescripcion" class="leading-relaxed"></p>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-6">
+        <button onclick="closeModal()" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .animate-fadeIn { animation: fadeIn .3s ease-out forwards; }
+    @keyframes fadeIn { from { opacity:0; transform:scale(.95); } to { opacity:1; transform:scale(1); } }
+  </style>
+
+  <script>
+    function openModal(data) {
+      document.getElementById("modalTitulo").innerHTML = data.titulo;
+      document.getElementById("modalCodigo").innerText = data.codigo;
+      document.getElementById("modalAlumno").innerText = data.alumno;
+      document.getElementById("modalDni").innerText = data.dni;
+      document.getElementById("modalEstado").innerText = data.estado;
+      document.getElementById("modalFecha").innerText = data.fecha;
+      document.getElementById("modalMonto").innerText = data.monto;
+      document.getElementById("modalTipo").innerText = data.tipo;
+      document.getElementById("modalSerie").innerText = data.serie;
+      document.getElementById("modalNumero").innerText = data.numero;
+      document.getElementById("modalDescripcion").innerText = data.descripcion;
+
+      document.getElementById("modal").classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("modal").classList.add("hidden");
+    }
+
+    function descargarComprobante(tipo, codigo, serie, numero) {
+      // Construir la URL del controlador
+      const currentPath = window.location.pathname;
+      let baseUrl;
+      
+      if (currentPath.includes('/views/')) {
+        baseUrl = currentPath.substring(0, currentPath.indexOf('/views/'));
+      } else {
+        baseUrl = '';
+      }
+      
+      const url = baseUrl + '/controller/descargarComprobante.php?tipo=' + encodeURIComponent(tipo) + 
+                  '&codigo=' + encodeURIComponent(codigo) + 
+                  '&serie=' + encodeURIComponent(serie) + 
+                  '&numero=' + encodeURIComponent(numero) + 
+                  '&download=1';
+      
+      // Abrir en nueva ventana para imprimir/guardar como PDF
+      window.open(url, '_blank');
+    }
+  </script>
+
+</body>
+</html>

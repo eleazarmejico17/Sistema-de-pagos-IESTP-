@@ -1,0 +1,39 @@
+esto va  en el json para para la conexion con el hosting
+
+
+{
+    "name": "sispagos",                       
+    "host": "ftp.mallfers.com",         
+    "protocol": "ftp",                  
+    "port": 21,                        
+    "username": "sispagos@sispagos.mallfers.com",    
+    "password": "sispagos2025@",        
+    "remotePath": "/",                 
+
+    "uploadOnSave": true,               
+    "useTempFile": false,               
+    "openSsh": false,                   
+
+    "downloadOnOpen": true,             
+    "syncMode": "update",               
+
+    "watcher": {                        
+        "files": "/*",                
+        "autoUpload": true,            
+        "autoDelete": true             
+    },
+
+    "ignoreFile": ".vscode/sftp.json",  
+    "concurrency": 10,                   
+    "confirm": true,                    
+    "autoConfirm": false,               
+
+    "showOutput": true,                 
+
+    "remoteTimeOffsetInHours": 0,       
+    "preserveTime": true,               
+
+    "reconnectDelay": 3000,             
+    "connectTimeout": 10000,                        
+    "remoteExplorer.expand": true       
+}
