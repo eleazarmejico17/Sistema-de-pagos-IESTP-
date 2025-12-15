@@ -59,8 +59,8 @@ class BeneficiarioModel {
             if (empty($data['resolucion_id'])) {
                 throw new Exception('El ID de la resolución es requerido');
             }
-            if (empty($data['porcentaje_descuento'])) {
-                throw new Exception('El porcentaje de descuento es requerido');
+            if (!isset($data['porcentaje_descuento']) || $data['porcentaje_descuento'] === '' || $data['porcentaje_descuento'] === null) {
+                $data['porcentaje_descuento'] = 0.00;
             }
 
             // Obtener columnas reales de la tabla

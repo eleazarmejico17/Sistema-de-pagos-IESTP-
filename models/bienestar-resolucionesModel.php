@@ -38,6 +38,7 @@ class ResolucionModel {
             'numero_resolucion',
             'titulo',
             'texto_respaldo',
+            'tipo_pago',
             'monto_descuento',
             'ruta_documento',
             'fecha_inicio',
@@ -48,6 +49,7 @@ class ResolucionModel {
             ':numero_resolucion',
             ':titulo',
             ':texto_respaldo',
+            ':tipo_pago',
             ':monto_descuento',
             ':ruta_documento',
             ':fecha_inicio',
@@ -58,6 +60,7 @@ class ResolucionModel {
             ':numero_resolucion' => $data['numero_resolucion'],
             ':titulo' => $data['titulo'],
             ':texto_respaldo' => $data['texto_respaldo'] ?? null,
+            ':tipo_pago' => isset($data['tipo_pago']) && $data['tipo_pago'] !== '' ? (int)$data['tipo_pago'] : null,
             ':monto_descuento' => isset($data['monto_descuento']) && $data['monto_descuento'] !== ''
                 ? (float)$data['monto_descuento']
                 : null,
@@ -65,6 +68,9 @@ class ResolucionModel {
             ':fecha_inicio' => $data['fecha_inicio'] ?? null,
             ':fecha_fin' => $data['fecha_fin'] ?? null
         ];
+
+        $campos[] = 'estado';
+        $valores[] = 'true';
 
         if ($creadoPor !== null && $creadoPor > 0) {
             $campos[] = 'creado_por';

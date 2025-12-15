@@ -26,6 +26,17 @@ unset($_SESSION['bienestar_errors'], $_SESSION['bienestar_previous_data']);
 $ctrl = new BienestarRegistroController();
 $resoluciones = $ctrl->listarResoluciones();
 
+// Obtener tipos de pago para asociar a la resolución
+$tiposPago = [];
+try {
+    require_once __DIR__ . '/../../../config/conexion.php';
+    $pdo = Conexion::getInstance()->getConnection();
+    $stmt = $pdo->query("SELECT id, nombre, descripcion FROM tipo_pago ORDER BY id ASC");
+    $tiposPago = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $tiposPago = [];
+}
+
 $oldValue = function (string $key) use ($previousData): string {
     return htmlspecialchars($previousData[$key] ?? '', ENT_QUOTES, 'UTF-8');
 };
@@ -214,6 +225,22 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
                 </div>
             </div>
 
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                    <i class="fas fa-receipt text-blue-600"></i>
+                    <span>Tipo de Pago al que aplica</span>
+                    <span class="text-red-500">*</span>
+                </label>
+                <select name="tipo_pago" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm font-medium shadow-sm hover:border-gray-400">
+                    <option value="">Seleccione...</option>
+                    <?php foreach ($tiposPago as $tp): ?>
+                        <option value="<?= (int)$tp['id'] ?>" <?= ($oldValue('tipo_pago') !== '' && (int)$oldValue('tipo_pago') === (int)$tp['id']) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)($tp['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
             <!-- Descripción mejorada -->
             <div>
                 <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
@@ -265,6 +292,105 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         </form>
     </div>
 
+</section>
+
+<section class="grid grid-cols-1 xl:grid-cols-1 gap-6 max-w-4xl mx-auto mt-6">
+    <div class="form-card group relative bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200/50 card-anim">
+        <div class="relative bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-600 p-6 overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" style="background-size: 200% 100%;"></div>
+            <div class="relative flex items-center gap-4">
+                <div class="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-xl border-2 border-white/30">
+                    <i class="fas fa-user-check text-white text-2xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-bold text-2xl mb-1">Nuevo Beneficiario</h3>
+                    <p class="text-white/90 text-sm font-medium">Asignar beneficio a estudiante</p>
+                </div>
+            </div>
+        </div>
+
+        <form method="POST" action="dashboard-bienestar.php?pagina=registro-bienestar-estudiantil" class="p-6 md:p-8 space-y-6 bg-gradient-to-b from-white via-gray-50/50 to-white">
+            <input type="hidden" name="accion" value="agregar_beneficiario">
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-1">
+                    <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <i class="fas fa-id-card text-emerald-600"></i>
+                        <span>DNI</span>
+                        <span class="text-red-500">*</span>
+                    </label>
+                    <div class="flex gap-2">
+                        <input id="dni" name="dni" maxlength="8" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl" placeholder="DNI (8 dígitos)" oninput="this.value=this.value.replace(/\D/g,'')">
+                        <button type="button" id="btnBuscarDNI" class="px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <input type="hidden" id="estudiante_id" name="estudiante_id" value="">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <i class="fas fa-file-signature text-emerald-600"></i>
+                        <span>Resolución</span>
+                        <span class="text-red-500">*</span>
+                    </label>
+                    <select name="resolucion_id" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl">
+                        <option value="">Seleccione...</option>
+                        <?php foreach ($resoluciones as $r): ?>
+                            <option value="<?= (int)$r['id'] ?>">
+                                <?= htmlspecialchars((string)($r['numero_resolucion'] ?? ''), ENT_QUOTES, 'UTF-8') ?> - <?= htmlspecialchars((string)($r['titulo'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+            <div id="infoEstudiante" class="hidden rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <div class="text-xs text-emerald-700 font-semibold">Estudiante</div>
+                        <div id="nombreEstudiante" class="text-sm text-emerald-900 font-bold">—</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-emerald-700 font-semibold">Programa</div>
+                        <input id="programa_estudios" readonly class="w-full mt-1 px-3 py-2 rounded-lg border border-emerald-200 bg-white text-sm" value="">
+                    </div>
+                    <div>
+                        <div class="text-xs text-emerald-700 font-semibold">Ciclo / Turno</div>
+                        <div class="flex gap-2 mt-1">
+                            <input id="ciclo" readonly class="w-full px-3 py-2 rounded-lg border border-emerald-200 bg-white text-sm" value="">
+                            <input id="turno" readonly class="w-full px-3 py-2 rounded-lg border border-emerald-200 bg-white text-sm" value="">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <i class="fas fa-calendar-alt text-emerald-600"></i>
+                        <span>Fecha Inicio</span>
+                    </label>
+                    <input type="date" name="fecha_inicio" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                        <i class="fas fa-calendar-times text-emerald-600"></i>
+                        <span>Fecha Fin</span>
+                    </label>
+                    <input type="date" name="fecha_fin" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl">
+                </div>
+            </div>
+
+            <div class="pt-4">
+                <button type="submit" class="w-full py-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:via-teal-700 hover:to-cyan-700 text-white font-bold text-base rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3 group">
+                    <i class="fas fa-user-plus text-lg group-hover:rotate-12 transition-transform"></i>
+                    <span>Agregar Beneficiario</span>
+                    <i class="fas fa-arrow-right text-sm group-hover:translate-x-1 transition-transform"></i>
+                </button>
+            </div>
+        </form>
+    </div>
 </section>
 
 <script>
@@ -403,20 +529,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     btnBuscarDNI.disabled = false;
                     btnBuscarDNI.classList.remove('opacity-75', 'cursor-not-allowed');
                 });
-        });
-    }
-
-    // Validación en tiempo real del porcentaje
-    const porcentajeInput = document.querySelector('input[name="porcentaje_descuento"]');
-    if (porcentajeInput) {
-        porcentajeInput.addEventListener('input', function() {
-            const value = parseFloat(this.value);
-            if (value < 0 || value > 100) {
-                this.classList.add('border-red-300');
-                showToast('El porcentaje debe estar entre 0 y 100', 'error');
-            } else {
-                this.classList.remove('border-red-300');
-            }
         });
     }
 

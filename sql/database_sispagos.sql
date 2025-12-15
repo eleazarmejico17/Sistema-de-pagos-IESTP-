@@ -1,134 +1,140 @@
+SET FOREIGN_KEY_CHECKS = 0; -- Desactiva temporalmente las restricciones para evitar conflictos de orden
 create database db_sistema;
-	use db_sistema;
-	set sql_mode='';
+use db_sistema;
+set sql_mode='';
 
-	create table  ubdepartamento(
-		id int primary key not null auto_increment,
-		departamento varchar(250)
-	);
+-- ============================================================
+-- 1. CREACIÓN DE TABLAS (ESTRUCTURA)
+-- ============================================================
 
-	create table  ubprovincia(
-		id int primary key not null auto_increment,
-		provincia varchar(250),
-		ubdepartamento int,
-		foreign key (ubdepartamento) references ubdepartamento(id)
-	);
+create table  ubdepartamento(
+	id int primary key not null auto_increment,
+	departamento varchar(250)
+);
 
-	create table  ubdistrito(
-		id int primary key not null auto_increment,
-		distrito varchar(250),
-		ubprovincia int,
-		foreign key (ubprovincia) references ubprovincia(id)
-	);
+create table  ubprovincia(
+	id int primary key not null auto_increment,
+	provincia varchar(250),
+	ubdepartamento int,
+	foreign key (ubdepartamento) references ubdepartamento(id)
+);
 
-	create table  estudiante(
-		id int primary key not null auto_increment,
-		ubdistrito int,
-		dni_est char(8),
-		ap_est varchar(40),
-		am_est varchar(40),
-		nom_est varchar(40),
-		sex_est char(1),
-		cel_est  char(9),
-		ubigeodir_est char(6),
-		ubigeonac_est char(6),
-		dir_est varchar(40),
-		mailp_est varchar(40),
-		maili_est varchar(40),
-		fecnac_est date,
-		foto_est varchar(40),
-		estado int,
-		foreign key (ubdistrito) references ubdistrito(id)
-	);
+create table  ubdistrito(
+	id int primary key not null auto_increment,
+	distrito varchar(250),
+	ubprovincia int,
+	foreign key (ubprovincia) references ubprovincia(id)
+);
 
-	create table  prog_estudios(
-		id int primary key not null auto_increment,
-		nom_progest varchar(40),
-		perfilingre_progest text,
-		perfilegre_progest text
-	);
+create table  estudiante(
+	id int primary key not null auto_increment,
+	ubdistrito int,
+	dni_est char(8),
+	ap_est varchar(40),
+	am_est varchar(40),
+	nom_est varchar(40),
+	sex_est char(1),
+	cel_est  char(9),
+	ubigeodir_est char(6),
+	ubigeonac_est char(6),
+	dir_est varchar(40),
+	mailp_est varchar(40),
+	maili_est varchar(40),
+	fecnac_est date,
+	foto_est varchar(40),
+	estado int,
+	foreign key (ubdistrito) references ubdistrito(id)
+);
 
-	create table  empleado(
-		id int primary key not null auto_increment,
-		prog_estudios int,
-		dni_emp char(8),
-		apnom_emp varchar(60),
-		sex_emp char(1),
-		cel_emp char(9),
-		ubigeodir_emp  char(6),
-		ubigeonac_emp char(6),
-		dir_emp varchar(40),
-		mailp_emp varchar(40),
-		maili_emp varchar(40) ,
-		fecnac_emp date,
-		cargo_emp char(1),
-		cond_emp char(1),
-		id_progest char(3),
-		fecinc_emp date,
-		foto_emp varchar(40),
-		estado int,
-		foreign key (prog_estudios) references prog_estudios(id)
-	);
+create table  prog_estudios(
+	id int primary key not null auto_increment,
+	nom_progest varchar(40),
+	perfilingre_progest text,
+	perfilegre_progest text
+);
 
-	create table  matricula(
-		id int primary key not null auto_increment,
-		estudiante int,
-		prog_estudios int,
-		id_matricula char(9),
-		per_lectivo varchar(7),
-		per_acad varchar(3),
-		per_acad2 int(1),
-		seccion char(1),
-		turno char(1),
-		fec_matricula date,
-		cond_matricula char(1),
-		est_matricula char(1),
-		est_perlec char(1),
-		obs_matricula varchar(50),
-		foreign key (estudiante) references estudiante(id),
-		foreign key (prog_estudios) references prog_estudios(id)
-	);
+create table  empleado(
+	id int primary key not null auto_increment,
+	prog_estudios int,
+	dni_emp char(8),
+	apnom_emp varchar(60),
+	sex_emp char(1),
+	cel_emp char(9),
+	ubigeodir_emp  char(6),
+	ubigeonac_emp char(6),
+	dir_emp varchar(40),
+	mailp_emp varchar(40),
+	maili_emp varchar(40) ,
+	fecnac_emp date,
+	cargo_emp char(1),
+	cond_emp char(1),
+	id_progest char(3),
+	fecinc_emp date,
+	foto_emp varchar(40),
+	estado int,
+	foreign key (prog_estudios) references prog_estudios(id)
+);
 
-	create table  usuarios(
-		id int primary key not null auto_increment,
-		usuario varchar(200),
-		password text,
-		tipo int, -- 1 ES EMPLEADO, 2 ES ESTUDIANTE, 3 ES EMPRESA, 4 ES BIENESTAR, 5 ES DIRECION
-		estuempleado int,
-		token text
-	);
+create table  matricula(
+	id int primary key not null auto_increment,
+	estudiante int,
+	prog_estudios int,
+	id_matricula char(9),
+	per_lectivo varchar(7),
+	per_acad varchar(3),
+	per_acad2 int(1),
+	seccion char(1),
+	turno char(1),
+	fec_matricula date,
+	cond_matricula char(1),
+	est_matricula char(1),
+	est_perlec char(1),
+	obs_matricula varchar(50),
+	foreign key (estudiante) references estudiante(id),
+	foreign key (prog_estudios) references prog_estudios(id)
+);
 
-	create table resoluciones(
-		id int primary key not null auto_increment,
-		numero_resolucion varchar(50) not null unique,
-		titulo varchar(255) not null,
-		texto_respaldo text,
-		monto_descuento decimal(10,2),
-		ruta_documento varchar(255),
-		fecha_inicio date,
-		fecha_fin date,
-		estado boolean default false,
-		creado_por int,
-		creado_en datetime,
-		foreign key (creado_por) references empleado(id)
-	);
+create table  usuarios(
+	id int primary key not null auto_increment,
+	usuario varchar(200),
+	password text,
+	tipo int, -- 1 ES EMPLEADO, 2 ES ESTUDIANTE, 3 ES EMPRESA, 4 ES BIENESTAR, 5 ES DIRECION
+	estuempleado int,
+	token text
+);
 
-	create table solicitudes(
-		id int primary key not null auto_increment,
-		estudiante int not null,
-		resoluciones int,
-		tipo_solicitud varchar(100) not null,
-		descripcion text,
-		estado enum('pendiente','en_evaluacion','aprobado','rechazado') default 'pendiente',
-		fecha_solicitud datetime,
-		fecha_revision datetime,
-		empleado int,
-		observaciones text,
-		foto text,
-		foreign key (estudiante) references estudiante(id),
-		foreign key (resoluciones) references resoluciones(id),
-		foreign key (empleado) references empleado(id)
-	);
+create table resoluciones(
+	id int primary key not null auto_increment,
+	numero_resolucion varchar(50) not null unique,
+	titulo varchar(255) not null,
+	texto_respaldo text,
+	tipo_pago int,
+	monto_descuento decimal(10,2) not null default 0.00,
+	ruta_documento varchar(255),
+	fecha_inicio date,
+	fecha_fin date,
+	estado boolean default false,
+	creado_por int,
+	creado_en datetime,
+	foreign key (creado_por) references empleado(id)
+);
+
+create table solicitudes(
+	id int primary key not null auto_increment,
+	estudiante int not null,
+	resoluciones int,
+	tipo_solicitud varchar(100) not null,
+	descripcion text,
+	estado enum('pendiente','en_evaluacion','aprobado','rechazado') default 'pendiente',
+	fecha_solicitud datetime,
+	fecha_revision datetime,
+	empleado int,
+	observaciones text,
+	foto text,
+	foreign key (estudiante) references estudiante(id),
+	foreign key (resoluciones) references resoluciones(id),
+	foreign key (empleado) references empleado(id)
+);
 
 create table historial_solicitudes(
 	id int primary key not null auto_increment,
@@ -145,7 +151,7 @@ create table beneficiarios(
 	id int primary key not null auto_increment,
 	estudiante int not null,
 	resoluciones int not null,
-	porcentaje_descuento decimal(5,2) not null,
+	porcentaje_descuento decimal(5,2) not null default 0.00,
 	fecha_inicio date,
 	fecha_fin date,
 	activo boolean default true,
@@ -160,7 +166,7 @@ create table historial_descuentos(
 	id int primary key not null auto_increment,
 	beneficiario_id int not null,
 	monto_original decimal(10,2) not null,
-	porcentaje_descuento decimal(5,2) not null,
+	porcentaje_descuento decimal(5,2) not null default 0.00,
 	monto_descuento decimal(10,2) not null,
 	monto_final decimal(10,2) not null,
 	aplicado_por int,
@@ -177,11 +183,24 @@ create table tipo_pago(
 	precio decimal(10,2) not null
 );
 
+ALTER TABLE resoluciones
+	ADD CONSTRAINT fk_resoluciones_tipo_pago
+	FOREIGN KEY (tipo_pago) REFERENCES tipo_pago(id);
+
+create table metodo_pago(
+	id int primary key not null auto_increment,
+	nombre varchar(50) not null unique,
+	descripcion varchar(150)
+);
+
 create table pagos(
 	id int primary key not null auto_increment,
 	estudiante int not null,
 	solicitudes int,
+	resolucion_aplicada int,
+	beneficiario_aplicado int,
 	tipo_pago int not null,
+	metodo_pago int,
 	monto_original decimal(10,2) not null,
 	monto_descuento decimal(10,2) default 0.00,
 	monto_final decimal(10,2) not null,
@@ -191,13 +210,45 @@ create table pagos(
 	registrado_en datetime,
 	foreign key (estudiante) references estudiante(id),
 	foreign key (solicitudes) references solicitudes(id),
+	foreign key (resolucion_aplicada) references resoluciones(id),
+	foreign key (beneficiario_aplicado) references beneficiarios(id),
 	foreign key (tipo_pago) references tipo_pago(id),
+	foreign key (metodo_pago) references metodo_pago(id),
 	foreign key (registrado_por) references empleado(id)
 );
+
+ALTER TABLE pagos
+	ADD COLUMN descuento_unico tinyint GENERATED ALWAYS AS (CASE WHEN monto_descuento > 0 THEN 1 ELSE NULL END) STORED,
+	ADD UNIQUE KEY uq_descuento_una_vez (estudiante, descuento_unico);
+
+CREATE TABLE IF NOT EXISTS `notificaciones_bienestar` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `tipo` varchar(50) NOT NULL COMMENT 'Tipo de notificación: aprobacion, rechazo, info, etc.',
+  `titulo` varchar(255) NOT NULL COMMENT 'Título de la notificación',
+  `mensaje` text NOT NULL COMMENT 'Mensaje completo de la notificación',
+  `id_resolucion` int(11) DEFAULT NULL COMMENT 'ID de la resolución relacionada (opcional)',
+  `id_empleado_creador` int(11) DEFAULT NULL COMMENT 'ID del empleado que creó la resolución original',
+  `id_empleado_revisor` int(11) DEFAULT NULL COMMENT 'ID del empleado de dirección que revisó',
+  `estado_notificacion` varchar(20) NOT NULL DEFAULT 'no_leida' COMMENT 'Estado: no_leida, leida, archivada',
+  `creado_en` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Fecha de creación de la notificación',
+  `leido_en` datetime DEFAULT NULL COMMENT 'Fecha cuando fue leída',
+  PRIMARY KEY (`id`),
+  KEY `idx_tipo` (`tipo`),
+  KEY `idx_estado` (`estado_notificacion`),
+  KEY `idx_resolucion` (`id_resolucion`),
+  KEY `idx_creador` (`id_empleado_creador`),
+  KEY `idx_creado_en` (`creado_en`),
+  CONSTRAINT `fk_notif_bien_resolucion` FOREIGN KEY (`id_resolucion`) REFERENCES `resoluciones` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_notif_bien_creador` FOREIGN KEY (`id_empleado_creador`) REFERENCES `empleado` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_notif_bien_revisor` FOREIGN KEY (`id_empleado_revisor`) REFERENCES `empleado` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci COMMENT='Notificaciones específicas para el área de bienestar';
+
+
 -- ============================================================
--- UBICACIÓN
+-- 2. INSERCIÓN DE DATOS DE CONFIGURACIÓN Y CATÁLOGOS
 -- ============================================================
 
+-- UBICACIÓN
 INSERT INTO ubdepartamento (departamento) VALUES
 ('Lima'),('Cusco'),('Arequipa'),('Piura'),('La Libertad'),
 ('Junín'),('Puno'),('Tacna'),('Moquegua'),('Lambayeque'),
@@ -216,10 +267,7 @@ INSERT INTO ubdistrito (distrito, ubprovincia) VALUES
 ('Independencia',11),('Pomahuaca',12),('Ayacucho Centro',13),('Ascensión',14),('Las Palmas',15),
 ('La Tinguiña',16),('Punchana',17),('Jorge Chávez',18),('Villa Rica',19),('Corrales',20);
 
--- ============================================================
 -- PROGRAMAS DE ESTUDIOS
--- ============================================================
-
 INSERT INTO prog_estudios (nom_progest, perfilingre_progest, perfilegre_progest) VALUES
 ('Diseño Web','Perfil ingreso','Perfil egreso'),
 ('Contabilidad','Perfil ingreso','Perfil egreso'),
@@ -242,8 +290,120 @@ INSERT INTO prog_estudios (nom_progest, perfilingre_progest, perfilegre_progest)
 ('Topografía','Perfil ingreso','Perfil egreso'),
 ('Computación Empresarial','Perfil ingreso','Perfil egreso');
 
+-- EMPLEADOS (MOVIDO AQUÍ PARA QUE EXISTA ANTES DE RESOLUCIONES)
+INSERT INTO empleado (
+    prog_estudios, dni_emp, apnom_emp, sex_emp, cel_emp,
+    ubigeodir_emp, ubigeonac_emp, dir_emp, mailp_emp, maili_emp,
+    fecnac_emp, cargo_emp, cond_emp, id_progest, fecinc_emp,
+    foto_emp, estado
+) VALUES
+(1,'44556601','Perez López Juan','M','910000001','150101','150101','Av A 1','emp1@gmail.com','emp1@istc.edu','1985-01-01','A','1','001','2020-01-01','e1.jpg',1),
+(2,'44556602','Sosa Silva Maria','F','910000002','150102','150102','Av A 2','emp2@gmail.com','emp2@istc.edu','1985-02-01','A','1','002','2020-02-01','e2.jpg',1),
+(3,'44556603','Torres Paredes Luis','M','910000003','150103','150103','Av A 3','emp3@gmail.com','emp3@istc.edu','1985-03-01','A','1','003','2020-03-01','e3.jpg',1),
+(4,'44556604','Ramos Guzman Ana','F','910000004','150104','150104','Av A 4','emp4@gmail.com','emp4@istc.edu','1985-04-01','A','1','004','2020-04-01','e4.jpg',1),
+(5,'44556605','Cruz Lopez Mateo','M','910000005','150105','150105','Av A 5','emp5@gmail.com','emp5@istc.edu','1985-05-01','A','1','005','2020-05-01','e5.jpg',1),
+(6,'44556606','Flores Vega Lucia','F','910000006','150106','150106','Av A 6','emp6@gmail.com','emp6@istc.edu','1985-06-01','A','1','006','2020-06-01','e6.jpg',1),
+(7,'44556607','Soto Rojas Pedro','M','910000007','150107','150107','Av A 7','emp7@gmail.com','emp7@istc.edu','1985-07-01','A','1','007','2020-07-01','e7.jpg',1),
+(8,'44556608','Cáceres Poma Rosa','F','910000008','150108','150108','Av A 8','emp8@gmail.com','emp8@istc.edu','1985-08-01','A','1','008','2020-08-01','e8.jpg',1),
+(9,'44556609','Nuñez Alvarez Jorge','M','910000009','150109','150109','Av A 9','emp9@gmail.com','emp9@istc.edu','1985-09-01','A','1','009','2020-09-01','e9.jpg',1),
+(10,'44556610','Vega Cano Karla','F','910000010','150110','150110','Av A 10','emp10@gmail.com','emp10@istc.edu','1985-10-01','A','1','010','2020-10-01','e10.jpg',1),
+(11,'44556611','Palacios Fajardo Luis','M','910000011','150111','150111','Av A 11','emp11@gmail.com','emp11@istc.edu','1985-11-01','A','1','011','2020-11-01','e11.jpg',1),
+(12,'44556612','Tello Zuniga Maria','F','910000012','150112','150112','Av A 12','emp12@gmail.com','emp12@istc.edu','1985-12-01','A','1','012','2020-12-01','e12.jpg',1),
+(13,'44556613','Zevallos Jara Juan','M','910000013','150113','150113','Av A 13','emp13@gmail.com','emp13@istc.edu','1986-01-01','A','1','013','2021-01-01','e13.jpg',1),
+(14,'44556614','Marquez Soto Laura','F','910000014','150114','150114','Av A 14','emp14@gmail.com','emp14@istc.edu','1986-02-01','A','1','014','2021-02-01','e14.jpg',1),
+(15,'44556615','Matos Reyes Miguel','M','910000015','150115','150115','Av A 15','emp15@gmail.com','emp15@istc.edu','1986-03-01','A','1','015','2021-03-01','e15.jpg',1),
+(16,'44556616','Quiroz Castro Milagros','F','910000016','150116','150116','Av A 16','emp16@gmail.com','emp16@istc.edu','1986-04-01','A','1','016','2021-04-01','e16.jpg',1),
+(17,'44556617','Arias Torres Bryan','M','910000017','150117','150117','Av A 17','emp17@gmail.com','emp17@istc.edu','1986-05-01','A','1','017','2021-05-01','e17.jpg',1),
+(18,'44556618','Campos Silva Diana','F','910000018','150118','150118','Av A 18','emp18@gmail.com','emp18@istc.edu','1986-06-01','A','1','018','2021-06-01','e18.jpg',1),
+(19,'44556619','Cortez Peña Cesar','M','910000019','150119','150119','Av A 19','emp19@gmail.com','emp19@istc.edu','1986-07-01','A','1','019','2021-07-01','e19.jpg',1),
+(20,'44556620','Garcia Barrios Paola','F','910000020','150120','150120','Av A 20','emp20@gmail.com','emp20@istc.edu','1986-08-01','A','1','020','2021-08-01','e20.jpg',1);
+
+-- USUARIOS
+INSERT INTO `usuarios` (`id`, `usuario`, `password`, `tipo`, `estuempleado`, `token`) VALUES
+(1, 'administrador', '$2y$10$vM7Y0C0k9AxDy7r/Fx1wVueGEL9dbSZDly1Rz6X5TR9X1Ss1LJMjq', 1, 23232323, '213131'),
+(2, 'TheCarlosXYZ', '$2y$10$g2KbP7r6ktH3dpaoocldZOrwCu9JTsXnTnZ.S6T31sKFgw.rnrpau', 2, 2265, '1'),
+(3, 'admin@gmail.com', '$2y$10$X2IMZYqSEbSJ1wOdG1LcOeA/rXHjRAIivFYb.wAye0o5CZTRcPuIe', 2, 12555414, '444');
+
+-- TIPO DE PAGO (MOVIDO AQUÍ PARA CORREGIR EL ERROR FK DE RESOLUCIONES)
+INSERT INTO tipo_pago (nombre, descripcion, precio) VALUES
+-- Conceptos de la Imagen 1
+('Carnet de Medio Pasaje', 'Emisión del carnet para el beneficio de medio pasaje estudiantil.', 18.00),
+('Duplicado de carnet', 'Solicitud del duplicado del carnet de medio pasaje.', 18.00),
+('Inscripción del postulante modalidad ordinario', 'Derecho de inscripción para postulantes que ingresan por la modalidad ordinaria.', 205.00),
+('Inscripción del postulante modalidad exonerados', 'Derecho de inscripción para postulantes que ingresan por modalidad de exoneración.', 205.00),
+('Inscripción del postulante modalidad por convenio de transitabilidad', 'Derecho de inscripción para postulantes bajo convenio de transitabilidad.', 100.00),
+('Trámite de Traslado Interno', 'Solicitud del trámite para traslado interno de carrera o facultad.', 8.00),
+('Trámite de Traslado de Turno', 'Solicitud del trámite para cambio de turno de estudios.', 8.00),
+('Trámite de Traslado Externo', 'Solicitud del trámite para traslado de otra institución educativa superior.', 8.00),
+('Ratificación de matrícula', 'Proceso de confirmación de matrícula para estudiantes regulares.', 172.00),
+('Matricula Ingresantes', 'Matrícula del primer semestre para estudiantes de nuevo ingreso.', 220.00),
+('Matrícula de ingresantes por exoneración', 'Matrícula del primer semestre para estudiantes ingresantes por exoneración.', 220.00),
+('Matrícula Traslado de Turno', 'Pago de matrícula asociado al cambio de turno de estudios.', 288.00),
+('Matrícula Traslado Interno', 'Pago de matrícula asociado al cambio interno de carrera o facultad.', 288.00),
+('Matrícula Traslado Externo', 'Pago de matrícula para estudiantes que se trasladan desde otra institución.', 515.00),
+('Trámite de matrícula extemporánea', 'Solicitud del trámite para matrícula fuera de las fechas establecidas.', 8.00),
+('Matrícula extemporánea', 'Pago por matrícula realizada fuera del período ordinario.', 233.00),
+('Reserva de matrícula por procesos', 'Pago por la reserva o postergación de matrícula.', 110.00),
+('Convalidación interna por semestre', 'Pago por la convalidación de cursos o asignaturas dentro de la institución por semestre.', 61.00),
+('Convalidación externa por semestre', 'Pago por la convalidación de cursos o asignaturas de otra institución por semestre.', 61.00),
+('Trámite de repitencia de semestre', 'Solicitud del trámite para repetición de asignaturas en el semestre.', 8.00),
+('Matrícula de repitencia de semestre', 'Pago de matrícula para la repetición de asignaturas en el semestre.', 343.00),
+('Trámite de Reingreso', 'Solicitud del trámite para reincorporación o reingreso a la institución.', 8.00),
+('Matrícula de Reingreso', 'Pago de matrícula para estudiantes que solicitan reincorporación.', 282.00),
+
+-- Conceptos de la Imagen 2
+('Repitencia de Unidad Didáctica', 'Pago por la repetición de una unidad didáctica o curso específico.', 30.00),
+('Constancias Diversas', 'Emisión de constancias de estudios, asistencia, o similares.', 18.00),
+('Constancia de Egresado', 'Emisión del documento que acredita la culminación de los estudios.', 24.00),
+('Evaluación de idioma extranjera, lengua nativa u originaria', 'Evaluación para certificar la suficiencia o dominio de un idioma.', 8.00),
+('Expedición de certificado de aprobación de suficiencia académica de inglés', 'Emisión del certificado que acredita la suficiencia académica en el idioma inglés.', 30.00),
+('Constancia de no adeudar', 'Emisión del documento que certifica que el estudiante no tiene deudas pendientes.', 18.00),
+('Expedición de certificado de estudios (x semestre) + formato', 'Emisión del certificado oficial de estudios por cada semestre, incluyendo el formato.', 165.00),
+('Expedición de certificado de egresado', 'Emisión del certificado oficial que acredita la condición de egresado.', 24.00),
+('Carpeta de prácticas preprofesionales', 'Costo de la carpeta para la presentación y registro de las prácticas preprofesionales.', 18.00),
+('Inscripción de trabajo de aplicación profesional', 'Derecho de inscripción para el trabajo de aplicación profesional o tesis.', 34.00),
+('Sustentación del Trabajo de aplicación profesional', 'Pago por el derecho a sustentar el trabajo de aplicación profesional o tesis.', 224.00),
+('Examen de Suficiencia profesional', 'Costo por el examen que evalúa la suficiencia profesional para la titulación.', 300.00),
+('Trabajo de Aplicación Profesional (Expedición de Título Profesional)', 'Costo total para obtener el Título Profesional mediante la modalidad de Trabajo de Aplicación Profesional.', 223.00),
+('Sistema por Asignaturas (Expedición de Título Profesional)', 'Costo total para obtener el Título Profesional mediante la modalidad de Sistema por Asignaturas.', 223.00),
+('Suficiencia profesional sistema modular (Expedición de Título Profesional)', 'Costo total para obtener el Título Profesional mediante la modalidad de Suficiencia Profesional Sistema Modular.', 223.00),
+('Duplicado de título profesional', 'Emisión del duplicado del Título Profesional.', 24.00),
+('Certificado de Egresado', 'Emisión del certificado que acredita la condición de egresado.', 8.00),
+('Duplicado de recibo de caja', 'Emisión de una copia del recibo de pago original.', 8.00),
+('Rectificación de nombre y apellidos', 'Trámite para corregir errores en el nombre o apellidos en documentos oficiales.', 30.00),
+('Venta de bases para licitación pública, concurso público y otros', 'Costo de las bases para participar en procesos de licitación o concurso.', 42.00), -- Precio ajustado al siguiente valor conocido
+('Servicio de capacitación, taller de capacitación/reforzamiento', 'Costo por participar en servicios de capacitación o talleres de reforzamiento.', 42.00),
+('Trámite de certificado modular', 'Solicitud del trámite para la emisión de un certificado modular.', 159.00),
+('Trámite de validación de las 720 horas de prácticas', 'Solicitud para la validación y certificación de 720 horas de prácticas.', 159.00),
+('Convalidación de prácticas preprofesionales por módulo', 'Pago por la convalidación de prácticas preprofesionales a nivel de módulo.', 92.00),
+('Convalidación de experiencias formativas en situaciones reales de trabajo por módulo', 'Pago por la convalidación de experiencias laborales como formación por módulo.', 30.00),
+('Trámite para el examen de teórico práctico', 'Solicitud para rendir el examen teórico-práctico.', 18.00),
+('Trámite de duplicado de actas', 'Solicitud para la emisión de un duplicado de actas de notas o evaluación.', 312.00),
+('Evaluación extraordinaria', 'Pago por el derecho a una evaluación académica extraordinaria.', 332.00),
+('Centro de Nivelación Académica - Ordinarios', 'Costo por el servicio del Centro de Nivelación Académica para estudiantes ordinarios.', 260.00),
+('Centro de Nivelación Académica - En partes', 'Costo fraccionado del servicio del Centro de Nivelación Académica.', 156.00),
+('Centro de Nivelación Académica - Hermanos', 'Costo del servicio del Centro de Nivelación Académica con descuento para hermanos.', 156.00), -- Asumiendo el valor de 'En partes'
+('Centro de Nivelación Académica - Convenios', 'Costo del servicio del Centro de Nivelación Académica bajo convenio.', 156.00); -- Asumiendo el valor de 'En partes'
+
+-- METODO DE PAGO (MOVIDO AQUÍ POR ORDEN LOGICO)
+INSERT INTO metodo_pago (nombre, descripcion) VALUES
+('Efectivo','Pago en caja'),
+('Transferencia','Transferencia bancaria'),
+('Yape/Plin','Pago por billetera digital');
+
+-- RESOLUCIONES (AHORA SI FUNCIONARA PORQUE TIPO_PAGO Y EMPLEADO YA EXISTEN)
+INSERT INTO resoluciones (
+    numero_resolucion, titulo, texto_respaldo,
+    tipo_pago, monto_descuento, ruta_documento, fecha_inicio,
+    fecha_fin, creado_por, creado_en
+) VALUES
+('RES-001','Deportista','Texto...',1,50,'res1.pdf','2025-01-01','2025-12-31',1,NOW()),
+('RES-002','Excelencia Académica','Texto...',2,40,'res2.pdf','2025-01-01','2025-12-31',2,NOW()),
+('RES-003','Actividad','Texto...',3,30,'res3.pdf','2025-01-01','2025-12-31',3,NOW()),
+('otros','Otros','Texto...',4,25,'res4.pdf','2025-01-01','2025-12-31',4,NOW());
+
 -- ============================================================
--- ESTUDIANTES
+-- 3. INSERCIÓN DE DATOS MASIVOS (ESTUDIANTES)
 -- ============================================================
 
 INSERT INTO `estudiante` (`id`, `ubdistrito`, `dni_est`, `ap_est`, `am_est`, `nom_est`, `sex_est`, `cel_est`, `ubigeodir_est`, `ubigeonac_est`, `dir_est`, `mailp_est`, `maili_est`, `fecnac_est`, `foto_est`, `estado`) VALUES
@@ -1503,64 +1663,12 @@ INSERT INTO `estudiante` (`id`, `ubdistrito`, `dni_est`, `ap_est`, `am_est`, `no
 (1251, NULL, '80842547', 'POMA', 'TIZA', 'JORGE LUIS', 'M', '977661408', '', '', '', '', '80842547@institutocajas.edu.pe', '0000-00-00', '', NULL),
 (1252, NULL, '80848836', 'TORRES', 'MUCHA', 'YERALDIN YHADIRA', 'F', '988814184', '', '', '', '', '80848836@institutocajas.edu.pe', '0000-00-00', '', NULL);
 
--- --------------------------------------------------------
--- EMPLEADOS (20)
--- ============================================================
-
-INSERT INTO empleado (
-    prog_estudios, dni_emp, apnom_emp, sex_emp, cel_emp,
-    ubigeodir_emp, ubigeonac_emp, dir_emp, mailp_emp, maili_emp,
-    fecnac_emp, cargo_emp, cond_emp, id_progest, fecinc_emp,
-    foto_emp, estado
-) VALUES
-(1,'44556601','Perez López Juan','M','910000001','150101','150101','Av A 1','emp1@gmail.com','emp1@istc.edu','1985-01-01','A','1','001','2020-01-01','e1.jpg',1),
-(2,'44556602','Sosa Silva Maria','F','910000002','150102','150102','Av A 2','emp2@gmail.com','emp2@istc.edu','1985-02-01','A','1','002','2020-02-01','e2.jpg',1),
-(3,'44556603','Torres Paredes Luis','M','910000003','150103','150103','Av A 3','emp3@gmail.com','emp3@istc.edu','1985-03-01','A','1','003','2020-03-01','e3.jpg',1),
-(4,'44556604','Ramos Guzman Ana','F','910000004','150104','150104','Av A 4','emp4@gmail.com','emp4@istc.edu','1985-04-01','A','1','004','2020-04-01','e4.jpg',1),
-(5,'44556605','Cruz Lopez Mateo','M','910000005','150105','150105','Av A 5','emp5@gmail.com','emp5@istc.edu','1985-05-01','A','1','005','2020-05-01','e5.jpg',1),
-(6,'44556606','Flores Vega Lucia','F','910000006','150106','150106','Av A 6','emp6@gmail.com','emp6@istc.edu','1985-06-01','A','1','006','2020-06-01','e6.jpg',1),
-(7,'44556607','Soto Rojas Pedro','M','910000007','150107','150107','Av A 7','emp7@gmail.com','emp7@istc.edu','1985-07-01','A','1','007','2020-07-01','e7.jpg',1),
-(8,'44556608','Cáceres Poma Rosa','F','910000008','150108','150108','Av A 8','emp8@gmail.com','emp8@istc.edu','1985-08-01','A','1','008','2020-08-01','e8.jpg',1),
-(9,'44556609','Nuñez Alvarez Jorge','M','910000009','150109','150109','Av A 9','emp9@gmail.com','emp9@istc.edu','1985-09-01','A','1','009','2020-09-01','e9.jpg',1),
-(10,'44556610','Vega Cano Karla','F','910000010','150110','150110','Av A 10','emp10@gmail.com','emp10@istc.edu','1985-10-01','A','1','010','2020-10-01','e10.jpg',1),
-(11,'44556611','Palacios Fajardo Luis','M','910000011','150111','150111','Av A 11','emp11@gmail.com','emp11@istc.edu','1985-11-01','A','1','011','2020-11-01','e11.jpg',1),
-(12,'44556612','Tello Zuniga Maria','F','910000012','150112','150112','Av A 12','emp12@gmail.com','emp12@istc.edu','1985-12-01','A','1','012','2020-12-01','e12.jpg',1),
-(13,'44556613','Zevallos Jara Juan','M','910000013','150113','150113','Av A 13','emp13@gmail.com','emp13@istc.edu','1986-01-01','A','1','013','2021-01-01','e13.jpg',1),
-(14,'44556614','Marquez Soto Laura','F','910000014','150114','150114','Av A 14','emp14@gmail.com','emp14@istc.edu','1986-02-01','A','1','014','2021-02-01','e14.jpg',1),
-(15,'44556615','Matos Reyes Miguel','M','910000015','150115','150115','Av A 15','emp15@gmail.com','emp15@istc.edu','1986-03-01','A','1','015','2021-03-01','e15.jpg',1),
-(16,'44556616','Quiroz Castro Milagros','F','910000016','150116','150116','Av A 16','emp16@gmail.com','emp16@istc.edu','1986-04-01','A','1','016','2021-04-01','e16.jpg',1),
-(17,'44556617','Arias Torres Bryan','M','910000017','150117','150117','Av A 17','emp17@gmail.com','emp17@istc.edu','1986-05-01','A','1','017','2021-05-01','e17.jpg',1),
-(18,'44556618','Campos Silva Diana','F','910000018','150118','150118','Av A 18','emp18@gmail.com','emp18@istc.edu','1986-06-01','A','1','018','2021-06-01','e18.jpg',1),
-(19,'44556619','Cortez Peña Cesar','M','910000019','150119','150119','Av A 19','emp19@gmail.com','emp19@istc.edu','1986-07-01','A','1','019','2021-07-01','e19.jpg',1),
-(20,'44556620','Garcia Barrios Paola','F','910000020','150120','150120','Av A 20','emp20@gmail.com','emp20@istc.edu','1986-08-01','A','1','020','2021-08-01','e20.jpg',1);
 
 -- ============================================================
--- USUARIOS (20)
+-- 4. INSERCIÓN DE DATOS TRANSACCIONALES
 -- ============================================================
 
-INSERT INTO `usuarios` (`id`, `usuario`, `password`, `tipo`, `estuempleado`, `token`) VALUES
-(1, 'administrador', '$2y$10$vM7Y0C0k9AxDy7r/Fx1wVueGEL9dbSZDly1Rz6X5TR9X1Ss1LJMjq', 1, 23232323, '213131'),
-(2, 'TheCarlosXYZ', '$2y$10$g2KbP7r6ktH3dpaoocldZOrwCu9JTsXnTnZ.S6T31sKFgw.rnrpau', 2, 2265, '1'),
-(3, 'admin@gmail.com', '$2y$10$X2IMZYqSEbSJ1wOdG1LcOeA/rXHjRAIivFYb.wAye0o5CZTRcPuIe', 2, 12555414, '444');
-
--- ============================================================
--- RESOLUCIONES (5)
--- ============================================================
-
-INSERT INTO resoluciones (
-    numero_resolucion, titulo, texto_respaldo,
-    monto_descuento, ruta_documento, fecha_inicio,
-    fecha_fin, creado_por, creado_en
-) VALUES
-('RES-001','Deportista','Texto...',50,'res1.pdf','2025-01-01','2025-12-31',1,NOW()),
-('RES-002','Excelencia Académica','Texto...',40,'res2.pdf','2025-01-01','2025-12-31',2,NOW()),
-('RES-003','Actividad','Texto...',30,'res3.pdf','2025-01-01','2025-12-31',3,NOW()),
-('otros','Otros','Texto...',25,'res4.pdf','2025-01-01','2025-12-31',4,NOW());
-
--- ============================================================
--- SOLICITUDES (20)
--- ============================================================
-
+-- SOLICITUDES
 INSERT INTO solicitudes (
     estudiante, resoluciones, tipo_solicitud,
     descripcion, estado, fecha_solicitud,
@@ -1587,10 +1695,7 @@ INSERT INTO solicitudes (
 (19,3,'Descuento','Solicitud 19','pendiente',NOW(),NULL,3,NULL,NULL),
 (20,4,'Descuento','Solicitud 20','pendiente',NOW(),NULL,4,NULL,NULL);
 
--- ============================================================
--- HISTORIAL SOLICITUDES (20)
--- ============================================================
-
+-- HISTORIAL SOLICITUDES
 INSERT INTO historial_solicitudes (solicitud_id, estado, fecha, empleado, comentarios) VALUES
 (1,'pendiente',NOW(),1,'Registrado'),
 (2,'pendiente',NOW(),2,'Registrado'),
@@ -1613,142 +1718,87 @@ INSERT INTO historial_solicitudes (solicitud_id, estado, fecha, empleado, coment
 (19,'pendiente',NOW(),19,'Registrado'),
 (20,'pendiente',NOW(),20,'Registrado');
 
--- ============================================================
--- BENEFICIARIOS (20)
--- ============================================================
-
+-- BENEFICIARIOS
 INSERT INTO beneficiarios (
     estudiante, resoluciones, porcentaje_descuento,
     fecha_inicio, fecha_fin, activo, registrado_por, registrado_en
 ) VALUES
-(1,1,50,'2025-01-01','2025-12-31',1,1,NOW()),
-(2,2,40,'2025-01-01','2025-12-31',1,2,NOW()),
-(3,3,30,'2025-01-01','2025-12-31',1,3,NOW()),
-(4,4,25,'2025-01-01','2025-12-31',1,4,NOW()),
-(5,1,50,'2025-01-01','2025-12-31',1,1,NOW()),
-(6,2,40,'2025-01-01','2025-12-31',1,2,NOW()),
-(7,3,30,'2025-01-01','2025-12-31',1,3,NOW()),
-(8,4,25,'2025-01-01','2025-12-31',1,4,NOW()),
-(9,1,50,'2025-01-01','2025-12-31',1,1,NOW()),
-(10,2,40,'2025-01-01','2025-12-31',1,2,NOW()),
-(11,3,30,'2025-01-01','2025-12-31',1,3,NOW()),
-(12,4,25,'2025-01-01','2025-12-31',1,4,NOW()),
-(13,1,50,'2025-01-01','2025-12-31',1,1,NOW()),
-(14,2,40,'2025-01-01','2025-12-31',1,2,NOW()),
-(15,3,30,'2025-01-01','2025-12-31',1,3,NOW()),
-(16,4,25,'2025-01-01','2025-12-31',1,4,NOW()),
-(17,1,50,'2025-01-01','2025-12-31',1,1,NOW()),
-(18,2,40,'2025-01-01','2025-12-31',1,2,NOW()),
-(19,3,30,'2025-01-01','2025-12-31',1,3,NOW()),
-(20,4,25,'2025-01-01','2025-12-31',1,4,NOW());
+(1,1,0.00,'2025-01-01','2025-12-31',1,1,NOW()),
+(2,2,0.00,'2025-01-01','2025-12-31',1,2,NOW()),
+(3,3,0.00,'2025-01-01','2025-12-31',1,3,NOW()),
+(4,4,0.00,'2025-01-01','2025-12-31',1,4,NOW()),
+(5,1,0.00,'2025-01-01','2025-12-31',1,1,NOW()),
+(6,2,0.00,'2025-01-01','2025-12-31',1,2,NOW()),
+(7,3,0.00,'2025-01-01','2025-12-31',1,3,NOW()),
+(8,4,0.00,'2025-01-01','2025-12-31',1,4,NOW()),
+(9,1,0.00,'2025-01-01','2025-12-31',1,1,NOW()),
+(10,2,0.00,'2025-01-01','2025-12-31',1,2,NOW()),
+(11,3,0.00,'2025-01-01','2025-12-31',1,3,NOW()),
+(12,4,0.00,'2025-01-01','2025-12-31',1,4,NOW()),
+(13,1,0.00,'2025-01-01','2025-12-31',1,1,NOW()),
+(14,2,0.00,'2025-01-01','2025-12-31',1,2,NOW()),
+(15,3,0.00,'2025-01-01','2025-12-31',1,3,NOW()),
+(16,4,0.00,'2025-01-01','2025-12-31',1,4,NOW()),
+(17,1,0.00,'2025-01-01','2025-12-31',1,1,NOW()),
+(18,2,0.00,'2025-01-01','2025-12-31',1,2,NOW()),
+(19,3,0.00,'2025-01-01','2025-12-31',1,3,NOW()),
+(20,4,0.00,'2025-01-01','2025-12-31',1,4,NOW());
 
--- ============================================================
--- HISTORIAL DESCUENTOS (20)
--- ============================================================
-
+-- HISTORIAL DESCUENTOS
 INSERT INTO historial_descuentos (
     beneficiario_id, monto_original, porcentaje_descuento,
     monto_descuento, monto_final, aplicado_por, aplicado_en, observaciones
 ) VALUES
-(1,300,50,150,150,1,NOW(),'OK'),
-(2,400,40,160,240,2,NOW(),'OK'),
-(3,350,30,105,245,3,NOW(),'OK'),
-(4,280,25,70,210,4,NOW(),'OK'),
-(5,200,20,40,160,5,NOW(),'OK'),
-(6,500,35,175,325,6,NOW(),'OK'),
-(7,250,15,37.50,212.50,7,NOW(),'OK'),
-(8,300,30,90,210,8,NOW(),'OK'),
-(9,350,10,35,315,9,NOW(),'OK'),
-(10,280,5,14,266,10,NOW(),'OK'),
-(11,300,100,300,0,11,NOW(),'OK'),
-(12,400,50,200,200,12,NOW(),'OK'),
-(13,450,18,81,369,13,NOW(),'OK'),
-(14,220,12,26.4,193.6,14,NOW(),'OK'),
-(15,500,27,135,365,15,NOW(),'OK'),
-(16,450,22,99,351,16,NOW(),'OK'),
-(17,300,17,51,249,17,NOW(),'OK'),
-(18,600,42,252,348,18,NOW(),'OK'),
-(19,320,31,99.2,220.8,19,NOW(),'OK'),
-(20,410,29,118.9,291.1,20,NOW(),'OK');
+(1,300,0.00,50,250,1,NOW(),'OK'),
+(2,400,0.00,40,360,2,NOW(),'OK'),
+(3,350,0.00,30,320,3,NOW(),'OK'),
+(4,280,0.00,25,255,4,NOW(),'OK'),
+(5,300,0.00,50,250,5,NOW(),'OK'),
+(6,400,0.00,40,360,6,NOW(),'OK'),
+(7,350,0.00,30,320,7,NOW(),'OK'),
+(8,280,0.00,25,255,8,NOW(),'OK'),
+(9,300,0.00,50,250,9,NOW(),'OK'),
+(10,400,0.00,40,360,10,NOW(),'OK'),
+(11,350,0.00,30,320,11,NOW(),'OK'),
+(12,280,0.00,25,255,12,NOW(),'OK'),
+(13,300,0.00,50,250,13,NOW(),'OK'),
+(14,400,0.00,40,360,14,NOW(),'OK'),
+(15,350,0.00,30,320,15,NOW(),'OK'),
+(16,280,0.00,25,255,16,NOW(),'OK'),
+(17,300,0.00,50,250,17,NOW(),'OK'),
+(18,400,0.00,40,360,18,NOW(),'OK'),
+(19,350,0.00,30,320,19,NOW(),'OK'),
+(20,280,0.00,25,255,20,NOW(),'OK');
 
--- ============================================================
--- TIPO DE PAGO (20)
--- ============================================================
-
-INSERT INTO tipo_pago (nombre, descripcion) VALUES
-('Matrícula','Pago de matrícula'),
-('Pensión','Pago mensual'),
-('Certificado','Certificados académicos'),
-('Constancia','Constancias varias'),
-('Duplicado','Duplicados oficiales'),
-('Carnet','Carnet institucional'),
-('Biblioteca','Multas o pagos biblioteca'),
-('Taller','Talleres'),
-('Laboratorio','Uso de laboratorio'),
-('Especial','Pago especial'),
-('Trámite 1','Trámite extra'),
-('Trámite 2','Trámite extra'),
-('Trámite 3','Trámite extra'),
-('Trámite 4','Trámite extra'),
-('Trámite 5','Trámite extra'),
-('Trámite 6','Trámite extra'),
-('Trámite 7','Trámite extra'),
-('Trámite 8','Trámite extra'),
-('Trámite 9','Trámite extra'),
-('Trámite 10','Trámite extra');
-
--- ============================================================
--- PAGOS (20)
--- ============================================================
-
+-- PAGOS
 INSERT INTO pagos (
-    estudiante, solicitudes, tipo_pago,
+    estudiante, solicitudes, tipo_pago, metodo_pago,
     monto_original, monto_descuento, monto_final,
     fecha_pago, comprobante, registrado_por, registrado_en
 ) VALUES
-(1,1,1,300,150,150,NOW(),'comp1.jpg',1,NOW()),
-(2,2,2,400,160,240,NOW(),'comp2.jpg',2,NOW()),
-(3,3,3,350,105,245,NOW(),'comp3.jpg',3,NOW()),
-(4,4,4,280,70,210,NOW(),'comp4.jpg',4,NOW()),
-(5,5,5,200,40,160,NOW(),'comp5.jpg',5,NOW()),
-(6,6,6,500,175,325,NOW(),'comp6.jpg',6,NOW()),
-(7,7,7,250,37.5,212.5,NOW(),'comp7.jpg',7,NOW()),
-(8,8,8,300,90,210,NOW(),'comp8.jpg',8,NOW()),
-(9,9,9,350,35,315,NOW(),'comp9.jpg',9,NOW()),
-(10,10,10,280,14,266,NOW(),'comp10.jpg',10,NOW()),
-(11,11,11,300,300,0,NOW(),'comp11.jpg',11,NOW()),
-(12,12,12,400,200,200,NOW(),'comp12.jpg',12,NOW()),
-(13,13,13,450,81,369,NOW(),'comp13.jpg',13,NOW()),
-(14,14,14,220,26.4,193.6,NOW(),'comp14.jpg',14,NOW()),
-(15,15,15,500,135,365,NOW(),'comp15.jpg',15,NOW()),
-(16,16,16,450,99,351,NOW(),'comp16.jpg',16,NOW()),
-(17,17,17,300,51,249,NOW(),'comp17.jpg',17,NOW()),
-(18,18,18,600,252,348,NOW(),'comp18.jpg',18,NOW()),
-(19,19,19,320,99.2,220.8,NOW(),'comp19.jpg',19,NOW()),
-(20,20,20,410,118.9,291.1,NOW(),'comp20.jpg',20,NOW());
--- Tabla para almacenar notificaciones específicas para el área de bienestar
-CREATE TABLE IF NOT EXISTS `notificaciones_bienestar` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `tipo` varchar(50) NOT NULL COMMENT 'Tipo de notificación: aprobacion, rechazo, info, etc.',
-  `titulo` varchar(255) NOT NULL COMMENT 'Título de la notificación',
-  `mensaje` text NOT NULL COMMENT 'Mensaje completo de la notificación',
-  `id_resolucion` int(11) DEFAULT NULL COMMENT 'ID de la resolución relacionada (opcional)',
-  `id_empleado_creador` int(11) DEFAULT NULL COMMENT 'ID del empleado que creó la resolución original',
-  `id_empleado_revisor` int(11) DEFAULT NULL COMMENT 'ID del empleado de dirección que revisó',
-  `estado_notificacion` varchar(20) NOT NULL DEFAULT 'no_leida' COMMENT 'Estado: no_leida, leida, archivada',
-  `creado_en` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Fecha de creación de la notificación',
-  `leido_en` datetime DEFAULT NULL COMMENT 'Fecha cuando fue leída',
-  PRIMARY KEY (`id`),
-  KEY `idx_tipo` (`tipo`),
-  KEY `idx_estado` (`estado_notificacion`),
-  KEY `idx_resolucion` (`id_resolucion`),
-  KEY `idx_creador` (`id_empleado_creador`),
-  KEY `idx_creado_en` (`creado_en`),
-  CONSTRAINT `fk_notif_bien_resolucion` FOREIGN KEY (`id_resolucion`) REFERENCES `resoluciones` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_notif_bien_creador` FOREIGN KEY (`id_empleado_creador`) REFERENCES `empleado` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_notif_bien_revisor` FOREIGN KEY (`id_empleado_revisor`) REFERENCES `empleado` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci COMMENT='Notificaciones específicas para el área de bienestar';
+(1,1,1,1,300,50,250,NOW(),'comp1.jpg',1,NOW()),
+(2,2,2,2,400,40,360,NOW(),'comp2.jpg',2,NOW()),
+(3,3,3,3,350,30,320,NOW(),'comp3.jpg',3,NOW()),
+(4,4,4,1,280,25,255,NOW(),'comp4.jpg',4,NOW()),
+(5,5,1,2,300,50,250,NOW(),'comp5.jpg',5,NOW()),
+(6,6,2,3,400,40,360,NOW(),'comp6.jpg',6,NOW()),
+(7,7,3,1,350,30,320,NOW(),'comp7.jpg',7,NOW()),
+(8,8,4,2,280,25,255,NOW(),'comp8.jpg',8,NOW()),
+(9,9,1,3,300,50,250,NOW(),'comp9.jpg',9,NOW()),
+(10,10,2,1,400,40,360,NOW(),'comp10.jpg',10,NOW()),
+(11,11,3,2,350,30,320,NOW(),'comp11.jpg',11,NOW()),
+(12,12,4,3,280,25,255,NOW(),'comp12.jpg',12,NOW()),
+(13,13,1,1,300,50,250,NOW(),'comp13.jpg',13,NOW()),
+(14,14,2,2,400,40,360,NOW(),'comp14.jpg',14,NOW()),
+(15,15,3,3,350,30,320,NOW(),'comp15.jpg',15,NOW()),
+(16,16,4,1,280,25,255,NOW(),'comp16.jpg',16,NOW()),
+(17,17,1,2,300,50,250,NOW(),'comp17.jpg',17,NOW()),
+(18,18,2,3,400,40,360,NOW(),'comp18.jpg',18,NOW()),
+(19,19,3,1,350,30,320,NOW(),'comp19.jpg',19,NOW()),
+(20,20,4,2,280,25,255,NOW(),'comp20.jpg',20,NOW());
 
--- Insertar algunos datos de ejemplo (opcional)
+-- NOTIFICACIONES BIENESTAR
 INSERT INTO `notificaciones_bienestar` (`tipo`, `titulo`, `mensaje`, `id_resolucion`, `id_empleado_creador`, `estado_notificacion`) VALUES
 ('info', 'Sistema de Notificaciones Activo', 'El sistema de notificaciones para bienestar ha sido activado correctamente.', NULL, NULL, 'leida');
+
+SET FOREIGN_KEY_CHECKS = 1; -- Vuelve a activar las restricciones de seguridad

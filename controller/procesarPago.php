@@ -195,8 +195,11 @@ try {
 
     // El tipo_pago_id ya se obtuvo arriba desde los datos
     $solicitudId = $data['solicitud_id'] ?? null; // Opcional
-    $montoDescuento = $data['monto_descuento'] ?? 0.00;
-    $montoFinal = $monto - $montoDescuento;
+    $montoDescuento = 0.00;
+    $resolucionAplicadaId = null;
+    $beneficiarioAplicadoId = null;
+    $metodoPagoId = null;
+    $montoFinal = (float)$monto;
 
     // Verificar estructura de la tabla pagos antes de insertar
     try {
@@ -212,6 +215,106 @@ try {
                 $columnaEstudiante = 'id_estudiante';
             } else {
                 throw new Exception("No se encontró una columna de estudiante en la tabla pagos. Columnas disponibles: " . implode(', ', $columns));
+            }
+        }
+
+        // Reglas de descuento (monto fijo y una sola vez por estudiante)
+        $descuentoYaUsado = false;
+        try {
+            $stmtUsed = $db->prepare("SELECT 1 FROM pagos WHERE {$columnaEstudiante} = :estudiante AND monto_descuento > 0 LIMIT 1");
+            $stmtUsed->execute([':estudiante' => $estudianteId]);
+            $descuentoYaUsado = (bool)$stmtUsed->fetchColumn();
+        } catch (Throwable $e) {
+            // Si falla la consulta, no aplicar descuento por seguridad
+            $descuentoYaUsado = true;
+        }
+
+        if (!$descuentoYaUsado) {
+            try {
+                $stmtBenef = $db->prepare("
+                    SELECT
+                        b.id AS beneficiario_id,
+                        r.id AS resolucion_id,
+                        r.tipo_pago AS tipo_pago_id,
+                        r.monto_descuento AS monto_descuento
+                    FROM beneficiarios b
+                    INNER JOIN resoluciones r ON r.id = b.resoluciones
+                    WHERE b.estudiante = :estudiante
+                      AND b.activo = 1
+                      AND (b.fecha_fin IS NULL OR b.fecha_fin >= CURDATE())
+                      AND (b.fecha_inicio IS NULL OR b.fecha_inicio <= CURDATE())
+                      AND (r.fecha_fin IS NULL OR r.fecha_fin >= CURDATE())
+                      AND (r.fecha_inicio IS NULL OR r.fecha_inicio <= CURDATE())
+                      AND (r.tipo_pago IS NULL OR r.tipo_pago = :tipo_pago)
+                    ORDER BY COALESCE(r.monto_descuento, 0) DESC
+                    LIMIT 1
+                ");
+                $stmtBenef->execute([
+                    ':estudiante' => $estudianteId,
+                    ':tipo_pago' => $tipoPagoId,
+                ]);
+                $benef = $stmtBenef->fetch(PDO::FETCH_ASSOC);
+
+                if ($benef) {
+                    $resolucionAplicadaId = (int)($benef['resolucion_id'] ?? 0) ?: null;
+                    $beneficiarioAplicadoId = (int)($benef['beneficiario_id'] ?? 0) ?: null;
+                    $montoDescuento = (float)($benef['monto_descuento'] ?? 0);
+                    if ($montoDescuento < 0) {
+                        $montoDescuento = 0.00;
+                    }
+                    if ($montoDescuento > (float)$monto) {
+                        $montoDescuento = (float)$monto;
+                    }
+                }
+            } catch (Throwable $e) {
+                $montoDescuento = 0.00;
+                $resolucionAplicadaId = null;
+                $beneficiarioAplicadoId = null;
+            }
+        }
+
+        $montoFinal = (float)$monto - (float)$montoDescuento;
+        if ($montoFinal < 0) {
+            $montoFinal = 0.00;
+        }
+
+        // Método de pago: si viene como ID numérico, usarlo directamente; si viene string legacy, mapear a metodo_pago.id
+        if (is_numeric($metodo_pago) && (int)$metodo_pago > 0) {
+            $metodoPagoId = (int)$metodo_pago;
+        }
+
+        // Mapear método de pago (string) -> metodo_pago.id si existe tabla/columna
+        if ($metodoPagoId === null && in_array('metodo_pago', $columns, true)) {
+            $hasMetodoPagoTable = false;
+            try {
+                $stmtTbl = $db->query("SHOW TABLES LIKE 'metodo_pago'");
+                $hasMetodoPagoTable = (bool)$stmtTbl->fetch(PDO::FETCH_NUM);
+            } catch (Throwable $e) {
+                $hasMetodoPagoTable = false;
+            }
+
+            if ($hasMetodoPagoTable) {
+                $raw = strtolower(trim((string)$metodo_pago));
+                $patterns = [];
+                if (in_array($raw, ['yape', 'plin'], true)) {
+                    $patterns = ['%yape%', '%plin%'];
+                } elseif ($raw === 'transferencia') {
+                    $patterns = ['%transfer%'];
+                } elseif ($raw === 'deposito') {
+                    $patterns = ['%deposit%'];
+                } elseif ($raw === 'efectivo') {
+                    $patterns = ['%efectivo%'];
+                }
+
+                foreach ($patterns as $pat) {
+                    $stmtMp = $db->prepare('SELECT id FROM metodo_pago WHERE LOWER(nombre) LIKE :pat LIMIT 1');
+                    $stmtMp->execute([':pat' => $pat]);
+                    $metodoPagoId = $stmtMp->fetchColumn();
+                    if ($metodoPagoId) {
+                        $metodoPagoId = (int)$metodoPagoId;
+                        break;
+                    }
+                }
             }
         }
         
@@ -230,11 +333,29 @@ try {
             $valoresInsert[] = ":solicitudes";
             $parametros[':solicitudes'] = $solicitudId;
         }
+
+        if (in_array('resolucion_aplicada', $columns)) {
+            $columnasInsert[] = 'resolucion_aplicada';
+            $valoresInsert[] = ":resolucion_aplicada";
+            $parametros[':resolucion_aplicada'] = $resolucionAplicadaId;
+        }
+
+        if (in_array('beneficiario_aplicado', $columns)) {
+            $columnasInsert[] = 'beneficiario_aplicado';
+            $valoresInsert[] = ":beneficiario_aplicado";
+            $parametros[':beneficiario_aplicado'] = $beneficiarioAplicadoId;
+        }
         
         if (in_array('tipo_pago', $columns)) {
             $columnasInsert[] = 'tipo_pago';
             $valoresInsert[] = ":tipo_pago";
             $parametros[':tipo_pago'] = $tipoPagoId;
+        }
+
+        if (in_array('metodo_pago', $columns)) {
+            $columnasInsert[] = 'metodo_pago';
+            $valoresInsert[] = ":metodo_pago";
+            $parametros[':metodo_pago'] = $metodoPagoId;
         }
         
         if (in_array('monto_original', $columns)) {

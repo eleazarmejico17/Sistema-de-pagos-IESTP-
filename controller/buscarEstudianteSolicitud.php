@@ -8,7 +8,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-$dni = filter_input(INPUT_GET, 'dni', FILTER_SANITIZE_STRING);
+$dni = (string)(filter_input(INPUT_GET, 'dni', FILTER_SANITIZE_NUMBER_INT) ?? '');
+$dni = preg_replace('/\D/', '', $dni);
 
 if (empty($dni) || strlen($dni) !== 8 || !ctype_digit($dni)) {
     echo json_encode(['success' => false, 'message' => 'DNI inválido']);
@@ -16,7 +17,7 @@ if (empty($dni) || strlen($dni) !== 8 || !ctype_digit($dni)) {
 }
 
 try {
-    $db = Database::getInstance()->getConnection();
+    $db = Conexion::getInstance()->getConnection();
     
     $sql = $db->prepare("
         SELECT 

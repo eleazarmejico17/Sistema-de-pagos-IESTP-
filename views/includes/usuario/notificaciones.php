@@ -16,12 +16,20 @@ try {
     // Obtener ID del usuario actual
     $usuarioSesion = $_SESSION['usuario'] ?? '';
     $usuarioId = null;
+    $estudianteId = null;
     
     if (!empty($usuarioSesion)) {
         $stmtUser = $db->prepare("SELECT id FROM usuarios WHERE usuario = :usuario LIMIT 1");
         $stmtUser->execute([':usuario' => $usuarioSesion]);
         $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
         $usuarioId = $user['id'] ?? null;
+
+        if (preg_match('/^(\d{8})@institutocajas\.edu\.pe$/', (string)$usuarioSesion, $m)) {
+            $dniSesion = $m[1];
+            $stmtEst = $db->prepare('SELECT id FROM estudiante WHERE dni_est = :dni LIMIT 1');
+            $stmtEst->execute([':dni' => $dniSesion]);
+            $estudianteId = $stmtEst->fetch(PDO::FETCH_COLUMN) ?: null;
+        }
     }
     
     // Obtener notificaciones de la tabla solicitudes que estén aprobadas o rechazadas
@@ -43,12 +51,22 @@ try {
             FROM solicitudes s
             LEFT JOIN estudiante e ON s.estudiante = e.id
             WHERE s.estado IN ('aprobado', 'rechazado')
-            AND s.fecha_revision IS NOT NULL
+            AND s.fecha_revision IS NOT NULL";
+
+    if ($estudianteId !== null) {
+        $sqlSolicitudes .= "\n            AND s.estudiante = :estudiante_id";
+    }
+
+    $sqlSolicitudes .= "
             ORDER BY COALESCE(s.fecha_revision, s.fecha_solicitud, NOW()) DESC
             LIMIT 50";
     
     $stmt = $db->prepare($sqlSolicitudes);
-    $stmt->execute();
+    $paramsSolicitudes = [];
+    if ($estudianteId !== null) {
+        $paramsSolicitudes[':estudiante_id'] = (int)$estudianteId;
+    }
+    $stmt->execute($paramsSolicitudes);
     $notificacionesSolicitudes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Obtener notificaciones de pagos desde notificaciones_sistema

@@ -26,28 +26,49 @@ try {
     // ✅ CONEXIÓN CORRECTA
     $db = Conexion::getInstance()->getConnection();
 
-    // VALIDAMOS ID en tabla 'resoluciones' (nuevo sistema)
-    $check = $db->prepare("SELECT id, creado_por FROM resoluciones WHERE id = :id");
-    $check->execute([':id' => $id]);
-    if ($check->rowCount() === 0) {
-        throw new Exception("Resolución no encontrada");
+    $estadoDb = null;
+    $estadoIn = trim((string)$estado);
+    if ($estadoIn === 'Aprobado' || $estadoIn === 'aprobado' || $estadoIn === 'APROBADO') {
+        $estadoDb = 'aprobado';
+    } elseif ($estadoIn === 'Rechazado' || $estadoIn === 'rechazado' || $estadoIn === 'RECHAZADO') {
+        $estadoDb = 'rechazado';
+    } elseif ($estadoIn === 'En evaluación' || $estadoIn === 'en_evaluacion' || $estadoIn === 'EN_EVALUACION' || $estadoIn === 'evaluacion') {
+        $estadoDb = 'en_evaluacion';
+    } elseif ($estadoIn === 'Pendiente' || $estadoIn === 'pendiente') {
+        $estadoDb = 'pendiente';
+    } else {
+        throw new Exception('Estado inválido');
     }
-    $resolucionData = $check->fetch(PDO::FETCH_ASSOC);
+
+    $checkSol = $db->prepare("SELECT id, estudiante, resoluciones FROM solicitudes WHERE id = :id LIMIT 1");
+    $checkSol->execute([':id' => $id]);
+    $solicitud = $checkSol->fetch(PDO::FETCH_ASSOC);
+    if (!$solicitud) {
+        throw new Exception('Solicitud no encontrada');
+    }
 
     // BUSCAR EMPLEADO SEGÚN SESIÓN
     $empleadoId = null;
-    if (isset($_SESSION['usuario']['correo'])) {
-        $stmtEmp = $db->prepare("
-            SELECT id FROM empleado 
-            WHERE (maili_emp = :correo OR mailp_emp = :correo) 
-              AND estado = 1
-            LIMIT 1
-        ");
-        $stmtEmp->execute([':correo' => $_SESSION['usuario']['correo']]);
-        $emp = $stmtEmp->fetch(PDO::FETCH_ASSOC);
-        if ($emp) {
-            $empleadoId = (int)$emp['id'];
+    try {
+        $usuarioIdSesion = (int)($_SESSION['user_id'] ?? $_SESSION['usuario_id'] ?? 0);
+        $usuarioSesion = (string)($_SESSION['usuario'] ?? '');
+        if ($usuarioIdSesion > 0) {
+            $stmtUser = $db->prepare('SELECT estuempleado FROM usuarios WHERE id = :id LIMIT 1');
+            $stmtUser->execute([':id' => $usuarioIdSesion]);
+            $u = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            if ($u && !empty($u['estuempleado'])) {
+                $empleadoId = (int)$u['estuempleado'];
+            }
+        } elseif ($usuarioSesion !== '') {
+            $stmtUser = $db->prepare('SELECT estuempleado FROM usuarios WHERE usuario = :usuario LIMIT 1');
+            $stmtUser->execute([':usuario' => $usuarioSesion]);
+            $u = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            if ($u && !empty($u['estuempleado'])) {
+                $empleadoId = (int)$u['estuempleado'];
+            }
         }
+    } catch (Throwable $e) {
+        $empleadoId = null;
     }
 
     // CONSTRUIR CAMPOS para tabla 'solicitudes'
@@ -58,7 +79,7 @@ try {
     ];
 
     $params = [
-        ':estado' => $estado,
+        ':estado' => $estadoDb,
         ':motivo' => $motivo,
         ':id'     => $id
     ];
@@ -68,111 +89,134 @@ try {
         $params[':empleado_id'] = $empleadoId;
     }
 
-    // ACTUALIZAR en tabla 'resoluciones' (nuevo sistema)
-    if ($estado === 'Aprobado' || $estado === 'aprobado' || $estado === 'APROBADO') {
-        $sql = "UPDATE resoluciones SET estado = true WHERE id = :id";
-    } else {
-        $sql = "UPDATE resoluciones SET estado = false WHERE id = :id";
-    }
+    $sql = "UPDATE solicitudes SET " . implode(', ', $set) . " WHERE id = :id";
     $stmt = $db->prepare($sql);
-    $stmt->execute([':id' => $id]);
+    $stmt->execute($params);
+
+    if ($estadoDb === 'aprobado') {
+        $estudianteId = (int)($solicitud['estudiante'] ?? 0);
+        $resolucionId = (int)($solicitud['resoluciones'] ?? 0);
+        if ($estudianteId <= 0 || $resolucionId <= 0) {
+            throw new Exception('No se pudo determinar estudiante o resolución de la solicitud');
+        }
+
+        $stmtRes = $db->prepare('SELECT fecha_inicio, fecha_fin FROM resoluciones WHERE id = :id LIMIT 1');
+        $stmtRes->execute([':id' => $resolucionId]);
+        $res = $stmtRes->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $fechaInicio = !empty($res['fecha_inicio']) ? (string)$res['fecha_inicio'] : date('Y-m-d');
+        $fechaFin = !empty($res['fecha_fin']) ? (string)$res['fecha_fin'] : null;
+
+        $stmtBen = $db->prepare('SELECT id FROM beneficiarios WHERE estudiante = :est AND resoluciones = :res LIMIT 1');
+        $stmtBen->execute([':est' => $estudianteId, ':res' => $resolucionId]);
+        $beneficiarioId = (int)($stmtBen->fetchColumn() ?: 0);
+
+        if ($beneficiarioId > 0) {
+            $sqlBen = 'UPDATE beneficiarios SET activo = 1, fecha_inicio = :fi, fecha_fin = :ff WHERE id = :id';
+            $stmtUpd = $db->prepare($sqlBen);
+            $stmtUpd->execute([
+                ':fi' => $fechaInicio,
+                ':ff' => $fechaFin,
+                ':id' => $beneficiarioId
+            ]);
+        } else {
+            $sqlBen = 'INSERT INTO beneficiarios (estudiante, resoluciones, porcentaje_descuento, fecha_inicio, fecha_fin, activo, registrado_por, registrado_en)
+                       VALUES (:est, :res, 0.00, :fi, :ff, 1, :emp, NOW())';
+            $stmtIns = $db->prepare($sqlBen);
+            $stmtIns->execute([
+                ':est' => $estudianteId,
+                ':res' => $resolucionId,
+                ':fi' => $fechaInicio,
+                ':ff' => $fechaFin,
+                ':emp' => $empleadoId
+            ]);
+        }
+    }
 
     
     // INSERTAR HISTORIAL SI EXISTE EMPLEADO
     if ($empleadoId !== null) {
-        $historial = $db->prepare("
-            INSERT INTO historial_solicitudes 
-            (solicitud_id, estado, empleado_id, comentarios)
-            VALUES (:sid, :estado, :emp, :coment)
-        ");
-        $historial->execute([
-            ':sid'   => $id,
-            ':estado'=> $estado,
-            ':emp'   => $empleadoId,
-            ':coment'=> $motivo
-        ]);
+        try {
+            $historial = $db->prepare("
+                INSERT INTO historial_solicitudes 
+                (solicitud_id, estado, fecha, empleado, comentarios)
+                VALUES (:sid, :estado, NOW(), :emp, :coment)
+            ");
+            $historial->execute([
+                ':sid'   => $id,
+                ':estado'=> $estadoDb,
+                ':emp'   => $empleadoId,
+                ':coment'=> $motivo
+            ]);
+        } catch (Throwable $e) {
+            $historial = $db->prepare("
+                INSERT INTO historial_solicitudes 
+                (solicitud_id, estado, empleado_id, comentarios)
+                VALUES (:sid, :estado, :emp, :coment)
+            ");
+            $historial->execute([
+                ':sid'   => $id,
+                ':estado'=> $estadoDb,
+                ':emp'   => $empleadoId,
+                ':coment'=> $motivo
+            ]);
+        }
     }
 
     // CREAR NOTIFICACIÓN PARA BIENESTAR CON DATOS DE RESOLUCIÓN
     try {
         // Obtener información completa de la resolución para la notificación
-        $stmtNotif = $db->prepare("
-            SELECT r.id, r.numero_resolucion, r.titulo, r.texto_respaldo, 
-                   r.monto_descuento, r.fecha_inicio, r.fecha_fin, r.creado_en,
-                   r.ruta_documento, r.creado_por,
-                   emp.apnom_emp AS creador_nombre, emp.mailp_emp AS creador_correo
-            FROM resoluciones r
-            LEFT JOIN empleado emp ON emp.id = r.creado_por
-            WHERE r.id = :id
-        ");
-        $stmtNotif->execute([':id' => $id]);
-        $notifData = $stmtNotif->fetch(PDO::FETCH_ASSOC);
-        
-        if ($notifData) {
-            // Construir mensaje con datos específicos de la resolución
-            $mensajeNotificacion = "Resolución N° " . ($notifData['numero_resolucion'] ?: 'N/A') . "\n";
-            $mensajeNotificacion .= "Título: " . ($notifData['titulo'] ?: 'Sin título') . "\n";
-            $mensajeNotificacion .= "Creador: " . ($notifData['creador_nombre'] ?: 'No especificado') . "\n";
-            
-            if ($notifData['monto_descuento'] && $notifData['monto_descuento'] > 0) {
-                $mensajeNotificacion .= "Descuento: S/ " . number_format($notifData['monto_descuento'], 2) . "\n";
-            }
-            
-            if ($notifData['fecha_inicio'] && $notifData['fecha_fin']) {
-                $mensajeNotificacion .= "Vigencia: " . date('d/m/Y', strtotime($notifData['fecha_inicio'])) . 
-                                       " al " . date('d/m/Y', strtotime($notifData['fecha_fin'])) . "\n";
-            }
-            
-            if ($estado === 'Rechazado' && $motivo) {
-                $mensajeNotificacion .= "Motivo de rechazo: " . $motivo;
-            } else {
-                $mensajeNotificacion .= "Estado: " . $estado . " por Dirección";
-            }
-            
-            // Insertar en historial_solicitudes con información detallada
-            $historialNotif = $db->prepare("
-                INSERT INTO historial_solicitudes 
-                (solicitud_id, estado, empleado_id, comentarios, fecha_registro)
-                VALUES (:sid, :estado, :emp, :coment, NOW())
+        $resolucionIdNotif = (int)($solicitud['resoluciones'] ?? 0);
+        if ($resolucionIdNotif > 0) {
+            $stmtNotif = $db->prepare("
+                SELECT r.id, r.numero_resolucion, r.titulo, r.texto_respaldo, 
+                       r.monto_descuento, r.fecha_inicio, r.fecha_fin, r.creado_en,
+                       r.ruta_documento, r.creado_por,
+                       emp.apnom_emp AS creador_nombre, emp.mailp_emp AS creador_correo
+                FROM resoluciones r
+                LEFT JOIN empleado emp ON emp.id = r.creado_por
+                WHERE r.id = :id
             ");
-            $historialNotif->execute([
-                ':sid'   => $id,
-                ':estado'=> $estado,
-                ':emp'   => $empleadoId,
-                ':coment'=> $mensajeNotificacion
-            ]);
-            
-            // Crear notificación específica para bienestar
-            $notifBienestar = $db->prepare("
-                INSERT INTO notificaciones_bienestar 
-                (tipo, titulo, mensaje, id_resolucion, id_empleado_creador, estado_notificacion, creado_en)
-                VALUES (:tipo, :titulo, :mensaje, :id_res, :id_emp, 'no_leida', NOW())
-            ");
-            
-            $tipoNotif = ($estado === 'Aprobado' || $estado === 'aprobado' || $estado === 'APROBADO') ? 'aprobacion' : 'rechazo';
-            $tituloNotif = "Resolución " . (($estado === 'Aprobado' || $estado === 'aprobado' || $estado === 'APROBADO') ? 'Aprobada' : 'Rechazada');
-            $mensajeCorto = "La resolución N° " . ($notifData['numero_resolucion'] ?: 'N/A') . 
-                           " ha sido " . (($estado === 'Aprobado' || $estado === 'aprobado' || $estado === 'APROBADO') ? 'aprobada' : 'rechazada') . 
-                           " por Dirección.";
-            
-            // DEBUG: Verificar datos antes de insertar
-            error_log("=== DEBUG CREANDO NOTIFICACIÓN ===");
-            error_log("Tipo: " . $tipoNotif);
-            error_log("Título: " . $tituloNotif);
-            error_log("Mensaje: " . $mensajeCorto);
-            error_log("ID Resolución: " . $id);
-            error_log("ID Empleado Creador: " . $notifData['creado_por']);
-            
-            $result = $notifBienestar->execute([
-                ':tipo' => $tipoNotif,
-                ':titulo' => $tituloNotif,
-                ':mensaje' => $mensajeCorto,
-                ':id_res' => $id,
-                ':id_emp' => $notifData['creado_por']
-            ]);
-            
-            error_log("Resultado de inserción: " . ($result ? 'EXITOSO' : 'FALLIDO'));
-            error_log("ID de última inserción: " . $db->lastInsertId());
+            $stmtNotif->execute([':id' => $resolucionIdNotif]);
+            $notifData = $stmtNotif->fetch(PDO::FETCH_ASSOC);
+            if ($notifData) {
+                $mensajeNotificacion = "Resolución N° " . ($notifData['numero_resolucion'] ?: 'N/A') . "\n";
+                $mensajeNotificacion .= "Título: " . ($notifData['titulo'] ?: 'Sin título') . "\n";
+                if ($notifData['monto_descuento'] && $notifData['monto_descuento'] > 0) {
+                    $mensajeNotificacion .= "Descuento: S/ " . number_format($notifData['monto_descuento'], 2) . "\n";
+                }
+                if ($estadoDb === 'rechazado' && $motivo) {
+                    $mensajeNotificacion .= "Motivo de rechazo: " . $motivo;
+                } else {
+                    $mensajeNotificacion .= "Estado: " . $estadoDb;
+                }
+
+                try {
+                    $historialNotif = $db->prepare("
+                        INSERT INTO historial_solicitudes 
+                        (solicitud_id, estado, fecha, empleado, comentarios)
+                        VALUES (:sid, :estado, NOW(), :emp, :coment)
+                    ");
+                    $historialNotif->execute([
+                        ':sid'   => $id,
+                        ':estado'=> $estadoDb,
+                        ':emp'   => $empleadoId,
+                        ':coment'=> $mensajeNotificacion
+                    ]);
+                } catch (Throwable $e) {
+                    $historialNotif = $db->prepare("
+                        INSERT INTO historial_solicitudes 
+                        (solicitud_id, estado, empleado_id, comentarios)
+                        VALUES (:sid, :estado, :emp, :coment)
+                    ");
+                    $historialNotif->execute([
+                        ':sid'   => $id,
+                        ':estado'=> $estadoDb,
+                        ':emp'   => $empleadoId,
+                        ':coment'=> $mensajeNotificacion
+                    ]);
+                }
+            }
         }
     } catch (Exception $e) {
         error_log("Error creando notificación: " . $e->getMessage());

@@ -141,6 +141,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['usuario']) && !isset(
     }
 }
 
+// Asignar o actualizar credenciales de estudiante
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? null) === 'asignar_acceso_estudiante') {
+    require_once __DIR__ . '/../config/conexion.php';
+    $pdo = Conexion::getInstance()->getConnection();
+
+    $redirectEstudiantes = 'dashboard-admin.php?pagina=panel-admin&modulo=admin-usuarios';
+
+    try {
+        $estudianteId = (int)($_POST['estudiante_id'] ?? 0);
+        $password = (string)($_POST['password'] ?? '');
+
+        if ($estudianteId <= 0 || $password === '') {
+            throw new Exception('Debe completar los campos obligatorios.');
+        }
+
+        $stmt = $pdo->prepare('SELECT id, dni_est FROM estudiante WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $estudianteId]);
+        $estudianteRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$estudianteRow) {
+            throw new Exception('Estudiante no encontrado.');
+        }
+
+        $dni = trim((string)($estudianteRow['dni_est'] ?? ''));
+        if ($dni === '') {
+            throw new Exception('El estudiante no tiene DNI.');
+        }
+
+        $usuario = strtolower($dni . '@institutocajas.edu.pe');
+
+        $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE estuempleado = :id AND tipo = 2 LIMIT 1');
+        $stmt->execute([':id' => $estudianteId]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE usuario = :usuario AND NOT (tipo = 2 AND estuempleado = :id) LIMIT 1');
+        $stmt->execute([':usuario' => $usuario, ':id' => $estudianteId]);
+        if ($stmt->fetch()) {
+            throw new Exception('El usuario ya existe.');
+        }
+
+        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+
+        if ($existing) {
+            $stmt = $pdo->prepare('UPDATE usuarios SET usuario = :usuario, password = :password, token = NULL WHERE id = :id');
+            $stmt->execute([
+                ':usuario' => $usuario,
+                ':password' => $passwordHash,
+                ':id' => (int)$existing['id'],
+            ]);
+
+            header('Location: ' . $redirectEstudiantes . '&status=access_updated');
+            exit;
+        }
+
+        $stmt = $pdo->prepare('INSERT INTO usuarios (usuario, password, tipo, estuempleado, token) VALUES (:usuario, :password, 2, :estuempleado, NULL)');
+        $stmt->execute([
+            ':usuario' => $usuario,
+            ':password' => $passwordHash,
+            ':estuempleado' => $estudianteId,
+        ]);
+
+        header('Location: ' . $redirectEstudiantes . '&status=access_created');
+        exit;
+    } catch (Throwable $e) {
+        $_SESSION['usuarios_estudiantes_errors'] = [$e->getMessage()];
+        header('Location: ' . $redirectEstudiantes . '&status=error');
+        exit;
+    }
+}
+
 // 2. Procesar actualizar estudiante
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'actualizar') {
     require_once __DIR__ . '/../controller/admin-usuariosController.php';
@@ -169,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['
                 'nombre' => $data['nom_est'] . ' ' . $data['ap_est'],
                 'tipo' => 'Estudiante'
             ]);
-            header("Location: dashboard-admin.php?pagina=usuarios&status=updated");
+            header("Location: dashboard-admin.php?pagina=panel-admin&modulo=admin-usuarios&status=updated");
             exit;
         }
     } catch (Exception $e) {
@@ -178,222 +247,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['
 }
 
 // Procesar eliminación de estudiante
-if (isset($_GET['delete']) && isset($_GET['pagina']) && $_GET['pagina'] === 'usuarios') {
+if (isset($_GET['delete']) && (($_GET['pagina'] ?? 'panel-admin') === 'panel-admin') && (($_GET['modulo'] ?? null) === 'admin-usuarios')) {
     require_once __DIR__ . '/../controller/admin-usuariosController.php';
     require_once __DIR__ . '/../controller/NotificacionHelper.php';
-    
+
     $ctrl = new EstudiantesController();
-    $deleteId = filter_input(INPUT_GET, 'delete', FILTER_SANITIZE_NUMBER_INT);
-    
-    if ($deleteId) {
-        $estudianteEliminar = $ctrl->obtener($deleteId);
-        
-        if ($ctrl->eliminar($deleteId)) {
-            if ($estudianteEliminar) {
-                NotificacionHelper::crear('eliminar', 'usuario', [
-                    'nombre' => ($estudianteEliminar['nom_est'] ?? '') . ' ' . ($estudianteEliminar['ap_est'] ?? ''),
-                    'tipo' => 'Estudiante'
-                ]);
-            }
-            header("Location: dashboard-admin.php?pagina=usuarios&status=deleted");
-            exit;
-        }
-    }
-}
+    $redirectUrl = 'dashboard-admin.php?pagina=panel-admin&modulo=admin-usuarios';
 
-// Procesar acciones de admin-caja ANTES de cualquier output
-if (isset($_GET['pagina']) && $_GET['pagina'] === 'admin-caja') {
-    require_once __DIR__ . '/../config/conexion.php';
-    require_once __DIR__ . '/../controller/NotificacionHelper.php';
-    $pdo = Conexion::getInstance()->getConnection();
-
-    $redirectUrl = 'dashboard-admin.php?pagina=admin-caja';
-
-    // CRUD tipo_pago (usa precio)
     try {
-        $stmtColumns = $pdo->query('SHOW COLUMNS FROM tipo_pago');
-        $tipoPagoColumns = $stmtColumns->fetchAll(PDO::FETCH_COLUMN);
+        $estudianteId = filter_input(INPUT_GET, 'delete', FILTER_SANITIZE_NUMBER_INT);
+        if (!$estudianteId) {
+            throw new Exception('Solicitud inválida.');
+        }
+
+        $estudianteEliminar = $ctrl->obtener($estudianteId);
+
+        if (!$ctrl->eliminar($estudianteId)) {
+            throw new Exception('No se pudo eliminar el estudiante.');
+        }
+
+        try {
+            $pdo = Conexion::getInstance()->getConnection();
+            $stmt = $pdo->prepare('DELETE FROM usuarios WHERE estuempleado = :id AND tipo = 2');
+            $stmt->execute([':id' => $estudianteId]);
+        } catch (Throwable $e) {
+        }
+
+        if ($estudianteEliminar) {
+            NotificacionHelper::crear('eliminar', 'usuario', [
+                'nombre' => ($estudianteEliminar['nom_est'] ?? '') . ' ' . ($estudianteEliminar['ap_est'] ?? ''),
+                'tipo' => 'Estudiante'
+            ]);
+        }
+
+        header('Location: ' . $redirectUrl . '&status=deleted');
+        exit;
     } catch (Throwable $e) {
-        $tipoPagoColumns = [];
-    }
-
-    $hasPrecio = in_array('precio', $tipoPagoColumns, true);
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && in_array($_POST['accion'], ['crear', 'editar'], true) && isset($_POST['nombre'])) {
-        try {
-            $accion = (string)$_POST['accion'];
-            $nombre = trim((string)($_POST['nombre'] ?? ''));
-            $descripcion = trim((string)($_POST['descripcion'] ?? ''));
-            $precio = isset($_POST['precio']) ? (float)$_POST['precio'] : 0.00;
-
-            if ($nombre === '') {
-                throw new Exception('El nombre es obligatorio');
-            }
-
-            if ($accion === 'crear') {
-                if (!$hasPrecio) {
-                    throw new Exception('La columna precio no existe en tipo_pago');
-                }
-
-                $stmt = $pdo->prepare('INSERT INTO tipo_pago (nombre, descripcion, precio) VALUES (:nombre, :descripcion, :precio)');
-                $stmt->execute([
-                    ':nombre' => $nombre,
-                    ':descripcion' => $descripcion,
-                    ':precio' => $precio,
-                ]);
-
-                NotificacionHelper::crear('crear', 'tipo_pago', [
-                    'nombre' => $nombre,
-                    'descripcion' => $descripcion,
-                    'precio' => $precio,
-                ]);
-
-                header('Location: ' . $redirectUrl . '&msg=creado');
-                exit;
-            }
-
-            $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
-            if ($id <= 0) {
-                throw new Exception('ID inválido');
-            }
-
-            if (!$hasPrecio) {
-                throw new Exception('La columna precio no existe en tipo_pago');
-            }
-
-            $stmt = $pdo->prepare('UPDATE tipo_pago SET nombre = :nombre, descripcion = :descripcion, precio = :precio WHERE id = :id');
-            $stmt->execute([
-                ':id' => $id,
-                ':nombre' => $nombre,
-                ':descripcion' => $descripcion,
-                ':precio' => $precio,
-            ]);
-
-            NotificacionHelper::crear('editar', 'tipo_pago', [
-                'id' => $id,
-                'nombre' => $nombre,
-                'descripcion' => $descripcion,
-                'precio' => $precio
-            ]);
-
-            header('Location: ' . $redirectUrl . '&msg=actualizado');
-            exit;
-        } catch (Throwable $e) {
-            header('Location: ' . $redirectUrl . '&msg=error&detalle=' . urlencode($e->getMessage()));
-            exit;
-        }
-    }
-
-    if (isset($_GET['eliminar_tipo_pago'])) {
-        try {
-            $id = filter_var($_GET['eliminar_tipo_pago'], FILTER_VALIDATE_INT);
-            if (!$id) {
-                throw new Exception('ID inválido');
-            }
-
-            $stmtGet = $pdo->prepare('SELECT id, nombre, descripcion FROM tipo_pago WHERE id = :id LIMIT 1');
-            $stmtGet->execute([':id' => $id]);
-            $tipoPago = $stmtGet->fetch(PDO::FETCH_ASSOC);
-            if (!$tipoPago) {
-                throw new Exception('El tipo de pago no existe');
-            }
-
-            $stmtCheck = $pdo->prepare('SELECT COUNT(*) as count FROM pagos WHERE tipo_pago = :id');
-            $stmtCheck->execute([':id' => $id]);
-            $referencias = (int)($stmtCheck->fetch(PDO::FETCH_ASSOC)['count'] ?? 0);
-            if ($referencias > 0) {
-                throw new Exception('No se puede eliminar este tipo de pago porque está siendo usado en ' . $referencias . ' pago(s)');
-            }
-
-            $stmt = $pdo->prepare('DELETE FROM tipo_pago WHERE id = :id');
-            $stmt->execute([':id' => $id]);
-
-            NotificacionHelper::crear('eliminar', 'tipo_pago', [
-                'id' => $id,
-                'nombre' => $tipoPago['nombre'],
-                'descripcion' => $tipoPago['descripcion'] ?? ''
-            ]);
-
-            header('Location: ' . $redirectUrl . '&msg=eliminado');
-            exit;
-        } catch (Throwable $e) {
-            header('Location: ' . $redirectUrl . '&msg=error&detalle=' . urlencode($e->getMessage()));
-            exit;
-        }
-    }
-
-    // CRUD pagos
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion_pago']) && in_array($_POST['accion_pago'], ['crear', 'editar'], true)) {
-        try {
-            $accion = (string)$_POST['accion_pago'];
-            $pagoId = isset($_POST['pago_id']) ? (int)$_POST['pago_id'] : 0;
-
-            $estudianteId = (int)($_POST['estudiante'] ?? 0);
-            $tipoPagoId = (int)($_POST['tipo_pago'] ?? 0);
-            $montoOriginal = (float)($_POST['monto_original'] ?? 0);
-            $montoDescuento = (float)($_POST['monto_descuento'] ?? 0);
-            $comprobante = trim((string)($_POST['comprobante'] ?? ''));
-
-            if ($estudianteId <= 0 || $tipoPagoId <= 0 || $montoOriginal <= 0) {
-                throw new Exception('Complete los campos obligatorios del pago');
-            }
-
-            $montoFinal = max(0, $montoOriginal - $montoDescuento);
-
-            if ($accion === 'crear') {
-                $stmt = $pdo->prepare('INSERT INTO pagos (estudiante, tipo_pago, monto_original, monto_descuento, monto_final, fecha_pago, comprobante, registrado_por, registrado_en) VALUES (:estudiante, :tipo_pago, :monto_original, :monto_descuento, :monto_final, NOW(), :comprobante, NULL, NOW())');
-                $stmt->execute([
-                    ':estudiante' => $estudianteId,
-                    ':tipo_pago' => $tipoPagoId,
-                    ':monto_original' => $montoOriginal,
-                    ':monto_descuento' => $montoDescuento,
-                    ':monto_final' => $montoFinal,
-                    ':comprobante' => $comprobante !== '' ? $comprobante : null,
-                ]);
-
-                header('Location: ' . $redirectUrl . '&msg=pago_creado');
-                exit;
-            }
-
-            if ($pagoId <= 0) {
-                throw new Exception('Pago inválido');
-            }
-
-            $stmt = $pdo->prepare('UPDATE pagos SET estudiante = :estudiante, tipo_pago = :tipo_pago, monto_original = :monto_original, monto_descuento = :monto_descuento, monto_final = :monto_final, comprobante = :comprobante WHERE id = :id');
-            $stmt->execute([
-                ':id' => $pagoId,
-                ':estudiante' => $estudianteId,
-                ':tipo_pago' => $tipoPagoId,
-                ':monto_original' => $montoOriginal,
-                ':monto_descuento' => $montoDescuento,
-                ':monto_final' => $montoFinal,
-                ':comprobante' => $comprobante !== '' ? $comprobante : null,
-            ]);
-
-            header('Location: ' . $redirectUrl . '&msg=pago_actualizado');
-            exit;
-        } catch (Throwable $e) {
-            header('Location: ' . $redirectUrl . '&msg=error&detalle=' . urlencode($e->getMessage()));
-            exit;
-        }
-    }
-
-    if (isset($_GET['eliminar_pago'])) {
-        try {
-            $id = filter_var($_GET['eliminar_pago'], FILTER_VALIDATE_INT);
-            if (!$id) {
-                throw new Exception('ID inválido');
-            }
-
-            $stmt = $pdo->prepare('DELETE FROM pagos WHERE id = :id');
-            $stmt->execute([':id' => $id]);
-
-            header('Location: ' . $redirectUrl . '&msg=pago_eliminado');
-            exit;
-        } catch (Throwable $e) {
-            header('Location: ' . $redirectUrl . '&msg=error&detalle=' . urlencode($e->getMessage()));
-            exit;
-        }
+        $_SESSION['usuarios_estudiantes_errors'] = [$e->getMessage()];
+        header('Location: ' . $redirectUrl . '&status=error');
+        exit;
     }
 }
 
@@ -412,7 +304,7 @@ if (($_GET['pagina'] ?? 'panel-admin') === 'panel-admin' && ($_GET['modulo'] ?? 
                 throw new Exception('Solicitud inválida.');
             }
 
-            $stmt = $pdo->prepare('DELETE FROM usuarios WHERE id = :id AND tipo IN (4,5)');
+            $stmt = $pdo->prepare('DELETE FROM usuarios WHERE id = :id AND tipo IN (2,4,5)');
             $stmt->execute([':id' => $usuarioId]);
 
             header('Location: ' . $redirectUrl . '&status=access_removed');
@@ -479,11 +371,11 @@ if (($_GET['pagina'] ?? 'panel-admin') === 'panel-admin' && ($_GET['modulo'] ?? 
             $tipo = (int)($_POST['tipo'] ?? 0);
             $password = (string)($_POST['password'] ?? '');
 
-            if ($usuarioId <= 0 || !in_array($tipo, [4, 5], true)) {
+            if ($usuarioId <= 0 || !in_array($tipo, [2, 4, 5], true)) {
                 throw new Exception('Solicitud inválida.');
             }
 
-            $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE id = :id AND tipo IN (4,5) LIMIT 1');
+            $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE id = :id AND tipo IN (2,4,5) LIMIT 1');
             $stmt->execute([':id' => $usuarioId]);
             if (!$stmt->fetch()) {
                 throw new Exception('Usuario de sistema no encontrado.');
@@ -506,6 +398,274 @@ if (($_GET['pagina'] ?? 'panel-admin') === 'panel-admin' && ($_GET['modulo'] ?? 
         } catch (Throwable $e) {
             $_SESSION['usuarios_sistema_errors'] = [$e->getMessage()];
             header('Location: ' . $redirectUrl . '&status=error');
+            exit;
+        }
+    }
+}
+
+// Procesar acciones de admin-caja ANTES de cualquier output
+if (($_GET['pagina'] ?? null) === 'admin-caja') {
+    require_once __DIR__ . '/../config/conexion.php';
+    $pdo = Conexion::getInstance()->getConnection();
+
+    $redirectCaja = 'dashboard-admin.php?pagina=admin-caja';
+
+    $hasMetodoPagoTable = false;
+    $hasMetodoPagoColumnInPagos = false;
+    $hasPrecioColumnInTipoPago = false;
+
+    try {
+        $stmt = $pdo->query("SHOW TABLES LIKE 'metodo_pago'");
+        $hasMetodoPagoTable = (bool) $stmt->fetch(PDO::FETCH_NUM);
+    } catch (Throwable $e) {
+    }
+
+    try {
+        $stmt = $pdo->query('SHOW COLUMNS FROM pagos');
+        $cols = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $hasMetodoPagoColumnInPagos = in_array('metodo_pago', $cols, true);
+    } catch (Throwable $e) {
+    }
+
+    try {
+        $stmt = $pdo->query('SHOW COLUMNS FROM tipo_pago');
+        $cols = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $hasPrecioColumnInTipoPago = in_array('precio', $cols, true);
+    } catch (Throwable $e) {
+    }
+
+    // Crear / Editar Tipo de Pago
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && in_array($_POST['accion'], ['crear', 'editar'], true)) {
+        try {
+            $accion = (string)$_POST['accion'];
+            $id = (int)($_POST['id'] ?? 0);
+            $nombre = trim((string)($_POST['nombre'] ?? ''));
+            $descripcion = trim((string)($_POST['descripcion'] ?? ''));
+            $precio = isset($_POST['precio']) ? (float)$_POST['precio'] : null;
+
+            if ($nombre === '') {
+                throw new Exception('El nombre es obligatorio.');
+            }
+            if ($accion === 'editar' && $id <= 0) {
+                throw new Exception('ID inválido.');
+            }
+
+            if ($accion === 'crear') {
+                if ($hasPrecioColumnInTipoPago) {
+                    if ($precio === null || $precio < 0) {
+                        throw new Exception('El precio es obligatorio.');
+                    }
+                    $stmt = $pdo->prepare('INSERT INTO tipo_pago (nombre, descripcion, precio) VALUES (:nombre, :descripcion, :precio)');
+                    $stmt->execute([':nombre' => $nombre, ':descripcion' => $descripcion, ':precio' => $precio]);
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO tipo_pago (nombre, descripcion) VALUES (:nombre, :descripcion)');
+                    $stmt->execute([':nombre' => $nombre, ':descripcion' => $descripcion]);
+                }
+
+                header('Location: ' . $redirectCaja . '&msg=creado');
+                exit;
+            }
+
+            if ($hasPrecioColumnInTipoPago) {
+                $stmt = $pdo->prepare('UPDATE tipo_pago SET nombre = :nombre, descripcion = :descripcion, precio = :precio WHERE id = :id');
+                $stmt->execute([':nombre' => $nombre, ':descripcion' => $descripcion, ':precio' => (float)$precio, ':id' => $id]);
+            } else {
+                $stmt = $pdo->prepare('UPDATE tipo_pago SET nombre = :nombre, descripcion = :descripcion WHERE id = :id');
+                $stmt->execute([':nombre' => $nombre, ':descripcion' => $descripcion, ':id' => $id]);
+            }
+
+            header('Location: ' . $redirectCaja . '&msg=actualizado');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: ' . $redirectCaja . '&msg=error&detalle=' . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    // Eliminar Tipo de Pago
+    if (isset($_GET['eliminar_tipo_pago'])) {
+        try {
+            $id = (int)($_GET['eliminar_tipo_pago'] ?? 0);
+            if ($id <= 0) {
+                throw new Exception('ID inválido.');
+            }
+
+            $stmt = $pdo->prepare('DELETE FROM tipo_pago WHERE id = :id');
+            $stmt->execute([':id' => $id]);
+
+            header('Location: ' . $redirectCaja . '&msg=eliminado');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: ' . $redirectCaja . '&msg=error&detalle=' . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    // Crear / Editar Método de Pago
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion_metodo']) && in_array($_POST['accion_metodo'], ['crear', 'editar'], true)) {
+        try {
+            if (!$hasMetodoPagoTable) {
+                throw new Exception('La tabla metodo_pago no existe en la base de datos.');
+            }
+
+            $accion = (string)$_POST['accion_metodo'];
+            $id = (int)($_POST['metodo_id'] ?? 0);
+            $nombre = trim((string)($_POST['metodo_nombre'] ?? ''));
+            $descripcion = trim((string)($_POST['metodo_descripcion'] ?? ''));
+
+            if ($nombre === '') {
+                throw new Exception('El nombre del método es obligatorio.');
+            }
+            if ($accion === 'editar' && $id <= 0) {
+                throw new Exception('ID inválido.');
+            }
+
+            if ($accion === 'crear') {
+                $stmt = $pdo->prepare('INSERT INTO metodo_pago (nombre, descripcion) VALUES (:nombre, :descripcion)');
+                $stmt->execute([':nombre' => $nombre, ':descripcion' => $descripcion]);
+                header('Location: ' . $redirectCaja . '&msg=creado');
+                exit;
+            }
+
+            $stmt = $pdo->prepare('UPDATE metodo_pago SET nombre = :nombre, descripcion = :descripcion WHERE id = :id');
+            $stmt->execute([':nombre' => $nombre, ':descripcion' => $descripcion, ':id' => $id]);
+            header('Location: ' . $redirectCaja . '&msg=actualizado');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: ' . $redirectCaja . '&msg=error&detalle=' . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    // Eliminar Método de Pago
+    if (isset($_GET['eliminar_metodo_pago'])) {
+        try {
+            if (!$hasMetodoPagoTable) {
+                throw new Exception('La tabla metodo_pago no existe en la base de datos.');
+            }
+
+            $id = (int)($_GET['eliminar_metodo_pago'] ?? 0);
+            if ($id <= 0) {
+                throw new Exception('ID inválido.');
+            }
+
+            $stmt = $pdo->prepare('DELETE FROM metodo_pago WHERE id = :id');
+            $stmt->execute([':id' => $id]);
+
+            header('Location: ' . $redirectCaja . '&msg=eliminado');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: ' . $redirectCaja . '&msg=error&detalle=' . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    // Crear / Editar Pago
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion_pago']) && in_array($_POST['accion_pago'], ['crear', 'editar'], true)) {
+        try {
+            $accion = (string)$_POST['accion_pago'];
+            $pagoId = (int)($_POST['pago_id'] ?? 0);
+            $estudianteId = (int)($_POST['estudiante'] ?? 0);
+            $tipoPago = (int)($_POST['tipo_pago'] ?? 0);
+            $metodoPago = (int)($_POST['metodo_pago'] ?? 0);
+            $montoOriginal = (float)($_POST['monto_original'] ?? 0);
+            $montoDescuento = (float)($_POST['monto_descuento'] ?? 0);
+            $comprobante = trim((string)($_POST['comprobante'] ?? ''));
+
+            if ($estudianteId <= 0 || $tipoPago <= 0) {
+                throw new Exception('Debe seleccionar estudiante y tipo de pago.');
+            }
+            if ($montoOriginal < 0 || $montoDescuento < 0) {
+                throw new Exception('Montos inválidos.');
+            }
+            if ($montoDescuento > $montoOriginal) {
+                throw new Exception('El descuento no puede ser mayor que el monto.');
+            }
+            if ($accion === 'editar' && $pagoId <= 0) {
+                throw new Exception('ID de pago inválido.');
+            }
+            if ($hasMetodoPagoColumnInPagos && $metodoPago <= 0) {
+                throw new Exception('Debe seleccionar método de pago.');
+            }
+
+            $montoFinal = $montoOriginal - $montoDescuento;
+
+            if ($accion === 'crear') {
+                if ($hasMetodoPagoColumnInPagos) {
+                    $stmt = $pdo->prepare('INSERT INTO pagos (estudiante, tipo_pago, metodo_pago, monto_original, monto_descuento, monto_final, fecha_pago, comprobante, registrado_por, registrado_en) VALUES (:estudiante, :tipo_pago, :metodo_pago, :monto_original, :monto_descuento, :monto_final, NOW(), :comprobante, NULL, NOW())');
+                    $stmt->execute([
+                        ':estudiante' => $estudianteId,
+                        ':tipo_pago' => $tipoPago,
+                        ':metodo_pago' => $metodoPago,
+                        ':monto_original' => $montoOriginal,
+                        ':monto_descuento' => $montoDescuento,
+                        ':monto_final' => $montoFinal,
+                        ':comprobante' => $comprobante,
+                    ]);
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO pagos (estudiante, tipo_pago, monto_original, monto_descuento, monto_final, fecha_pago, comprobante, registrado_por, registrado_en) VALUES (:estudiante, :tipo_pago, :monto_original, :monto_descuento, :monto_final, NOW(), :comprobante, NULL, NOW())');
+                    $stmt->execute([
+                        ':estudiante' => $estudianteId,
+                        ':tipo_pago' => $tipoPago,
+                        ':monto_original' => $montoOriginal,
+                        ':monto_descuento' => $montoDescuento,
+                        ':monto_final' => $montoFinal,
+                        ':comprobante' => $comprobante,
+                    ]);
+                }
+
+                header('Location: ' . $redirectCaja . '&msg=pago_creado');
+                exit;
+            }
+
+            if ($hasMetodoPagoColumnInPagos) {
+                $stmt = $pdo->prepare('UPDATE pagos SET estudiante = :estudiante, tipo_pago = :tipo_pago, metodo_pago = :metodo_pago, monto_original = :monto_original, monto_descuento = :monto_descuento, monto_final = :monto_final, comprobante = :comprobante WHERE id = :id');
+                $stmt->execute([
+                    ':estudiante' => $estudianteId,
+                    ':tipo_pago' => $tipoPago,
+                    ':metodo_pago' => $metodoPago,
+                    ':monto_original' => $montoOriginal,
+                    ':monto_descuento' => $montoDescuento,
+                    ':monto_final' => $montoFinal,
+                    ':comprobante' => $comprobante,
+                    ':id' => $pagoId,
+                ]);
+            } else {
+                $stmt = $pdo->prepare('UPDATE pagos SET estudiante = :estudiante, tipo_pago = :tipo_pago, monto_original = :monto_original, monto_descuento = :monto_descuento, monto_final = :monto_final, comprobante = :comprobante WHERE id = :id');
+                $stmt->execute([
+                    ':estudiante' => $estudianteId,
+                    ':tipo_pago' => $tipoPago,
+                    ':monto_original' => $montoOriginal,
+                    ':monto_descuento' => $montoDescuento,
+                    ':monto_final' => $montoFinal,
+                    ':comprobante' => $comprobante,
+                    ':id' => $pagoId,
+                ]);
+            }
+
+            header('Location: ' . $redirectCaja . '&msg=pago_actualizado');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: ' . $redirectCaja . '&msg=error&detalle=' . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    // Eliminar Pago
+    if (isset($_GET['eliminar_pago'])) {
+        try {
+            $id = (int)($_GET['eliminar_pago'] ?? 0);
+            if ($id <= 0) {
+                throw new Exception('ID inválido.');
+            }
+
+            $stmt = $pdo->prepare('DELETE FROM pagos WHERE id = :id');
+            $stmt->execute([':id' => $id]);
+
+            header('Location: ' . $redirectCaja . '&msg=pago_eliminado');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: ' . $redirectCaja . '&msg=error&detalle=' . urlencode($e->getMessage()));
             exit;
         }
     }

@@ -2,11 +2,11 @@
 $rolesPermitidos = ['usuario'];
 require_once __DIR__ . '/../public/aut.php';
 // Página actual
-$pagina = $_GET['pagina'] ?? 'usuario-solicitud';
+$pagina = $_GET['pagina'] ?? 'inicio';
 
 // Configuración central del menú con iconos FontAwesome
 $menu = [
-  'usuario-solicitud'   => ['icon' => 'fa-plus', 'texto' => 'NUEVO'],
+  'inicio'              => ['icon' => 'fa-home', 'texto' => 'INICIO'],
   'notificaciones'      => ['icon' => 'fa-bell', 'texto' => 'NOTIFICACIONES'],
   'pagos'               => ['icon' => 'fa-file-invoice', 'texto' => 'PAGOS'],
   'comprobantes'        => ['icon' => 'fa-folder', 'texto' => 'COMPROBANTES']
@@ -38,6 +38,7 @@ function activo($id, $pagina){
 <title>Dashboard Usuario</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<script src="assets/registrar_pago.js"></script>
 <style>
 @keyframes float {0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
 .animate-float { animation: float 4s ease-in-out infinite; }

@@ -27,6 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'numero_resolucion' => trim($_POST['numero_resolucion'] ?? ''),
                 'titulo' => trim($_POST['titulo'] ?? ''),
                 'texto_respaldo' => trim($_POST['texto_respaldo'] ?? ''),
+                'tipo_pago' => isset($_POST['tipo_pago']) ? (int)$_POST['tipo_pago'] : null,
+                'monto_descuento' => isset($_POST['monto_descuento']) ? (float)$_POST['monto_descuento'] : 0.00,
                 'fecha_inicio' => $_POST['fecha_inicio'] ?? null,
                 'fecha_fin' => $_POST['fecha_fin'] ?? null,
             ];
@@ -34,6 +36,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Validaciones básicas
             if (empty($data['numero_resolucion']) || empty($data['titulo']) || empty($data['fecha_inicio'])) {
                 throw new Exception('Los campos obligatorios deben ser completados.');
+            }
+
+            if (empty($data['tipo_pago']) || (int)$data['tipo_pago'] <= 0) {
+                throw new Exception('Debe seleccionar el tipo de pago al que aplica la resolución.');
+            }
+
+            if (!isset($data['monto_descuento']) || (float)$data['monto_descuento'] < 0) {
+                throw new Exception('El monto de descuento es inválido.');
             }
             
             $result = $ctrl->crearResolucion($data, $_FILES);
@@ -67,14 +77,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data = [
                 'estudiante_id' => $estudiante['id'],
                 'resolucion_id' => $_POST['resolucion_id'] ?? null,
-                'porcentaje_descuento' => $_POST['porcentaje_descuento'] ?? null,
+                'porcentaje_descuento' => 0.00,
                 'fecha_inicio' => $_POST['fecha_inicio'] ?? null,
                 'fecha_fin' => $_POST['fecha_fin'] ?? null,
                 'activo' => 1
             ];
             
             // Validaciones básicas
-            if (empty($data['resolucion_id']) || empty($data['porcentaje_descuento'])) {
+            if (empty($data['resolucion_id'])) {
                 throw new Exception('Los campos obligatorios deben ser completados.');
             }
             

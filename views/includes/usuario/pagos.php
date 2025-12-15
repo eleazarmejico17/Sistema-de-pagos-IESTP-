@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . '/../../../config/conexion.php';
 $pdo = Conexion::getInstance()->getConnection();
@@ -9,17 +8,17 @@ function obtenerDescuentosActivos($pdo, $estudianteId) {
         $stmt = $pdo->prepare("
             SELECT 
                 b.id as beneficiario_id,
-                b.porcentaje_descuento,
                 r.numero_resolucion,
                 r.titulo,
-                r.monto_descuento as monto_resolucion
+                r.monto_descuento as monto_resolucion,
+                r.tipo_pago as tipo_pago_id
             FROM beneficiarios b
             INNER JOIN resoluciones r ON b.resoluciones = r.id
             WHERE b.estudiante = :estudiante_id 
             AND b.activo = 1 
             AND (b.fecha_fin IS NULL OR b.fecha_fin >= CURDATE())
             AND (b.fecha_inicio IS NULL OR b.fecha_inicio <= CURDATE())
-            ORDER BY b.porcentaje_descuento DESC
+            ORDER BY COALESCE(r.monto_descuento, 0) DESC
         ");
         $stmt->execute([':estudiante_id' => $estudianteId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -27,6 +26,56 @@ function obtenerDescuentosActivos($pdo, $estudianteId) {
         error_log("Error obteniendo descuentos: " . $e->getMessage());
         return [];
     }
+
+}
+
+function obtenerEstudianteBasico($pdo, $estudianteId) {
+    if (!$estudianteId) return null;
+    try {
+        $stmt = $pdo->prepare("SELECT id, dni_est, ap_est, am_est, nom_est FROM estudiante WHERE id = :id LIMIT 1");
+        $stmt->execute([':id' => (int)$estudianteId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        $nombre = trim(($row['ap_est'] ?? '') . ' ' . ($row['am_est'] ?? '') . ' ' . ($row['nom_est'] ?? ''));
+        return [
+            'id' => (int)$row['id'],
+            'dni' => (string)($row['dni_est'] ?? ''),
+            'nombre' => $nombre,
+        ];
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+function descuentoYaUsado($pdo, $estudianteId) {
+    if (!$estudianteId) return false;
+    try {
+        $stmt = $pdo->prepare("SELECT 1 FROM pagos WHERE estudiante = :estudiante AND monto_descuento > 0 LIMIT 1");
+        $stmt->execute([':estudiante' => (int)$estudianteId]);
+        return (bool)$stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return true;
+    }
+}
+
+function obtenerMetodosPago($pdo) {
+    try {
+        $stmt = $pdo->query("SELECT id, nombre, descripcion FROM metodo_pago ORDER BY id ASC");
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($rows) {
+            return $rows;
+        }
+    } catch (Throwable $e) {
+        // ignore
+    }
+
+    return [
+        ['id' => 1, 'nombre' => 'Yape', 'descripcion' => 'Pago móvil rápido y seguro'],
+        ['id' => 2, 'nombre' => 'Plin', 'descripcion' => 'Pago móvil bancario'],
+        ['id' => 3, 'nombre' => 'Transferencia', 'descripcion' => 'Transferencia electrónica'],
+        ['id' => 4, 'nombre' => 'Depósito', 'descripcion' => 'Pago en cuenta bancaria'],
+        ['id' => 5, 'nombre' => 'Efectivo', 'descripcion' => 'Pago físico directo'],
+    ];
 }
 
 // Función para obtener ID del estudiante desde sesión
@@ -67,9 +116,19 @@ if ($estudianteIdActual) {
     $descuentosActivos = obtenerDescuentosActivos($pdo, $estudianteIdActual);
 }
 
-// DEBUG: Agregar información de depuración
-echo "<!-- DEBUG: ID Estudiante: " . ($estudianteIdActual ?? 'NULL') . " -->";
-echo "<!-- DEBUG: Descuentos Activos: " . print_r($descuentosActivos, true) . " -->";
+$estudianteBasico = obtenerEstudianteBasico($pdo, $estudianteIdActual);
+$dniEstudianteSesion = $estudianteBasico ? (string)($estudianteBasico['dni'] ?? '') : '';
+$nombreEstudianteSesion = $estudianteBasico ? (string)($estudianteBasico['nombre'] ?? '') : '';
+
+$descuentoBloqueado = false;
+if ($estudianteIdActual) {
+    $descuentoBloqueado = descuentoYaUsado($pdo, $estudianteIdActual);
+    if ($descuentoBloqueado) {
+        $descuentosActivos = [];
+    }
+}
+
+$metodosPago = obtenerMetodosPago($pdo);
 
 // Obtener TODOS los conceptos de pago con precio
 try {
@@ -108,599 +167,568 @@ try {
   <title>Pagos - IESTP</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    .animate-slide-up {
+        animation: slideUp 0.3s ease-out;
+    }
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-out;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .payment-card {
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+    }
+    .payment-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        border-color: #3b82f6;
+    }
+    .method-card {
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+    }
+    .method-card:hover {
+        transform: translateY(-2px);
+        border-color: #6366f1;
+    }
+    .method-card.selected {
+        border-color: #6366f1;
+        background-color: #f0f9ff;
+    }
+    .glow-effect {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    }
+  </style>
 </head>
 
-<body class="flex bg-gray-100 min-h-screen">
-  <main class="flex-1 p-8">
-    <div class="bg-white shadow rounded-xl p-6 overflow-x-auto">
-      <table class="min-w-full bg-white border-collapse">
-        <thead>
-          <tr class="bg-gray-200">
-            <th class="py-3 px-4 border border-gray-300 text-left font-semibold text-gray-700">ID</th>
-            <th class="py-3 px-4 border border-gray-300 text-left font-semibold text-gray-700">DESCRIPCIÓN</th>
-            <th class="py-3 px-4 border border-gray-300 text-left font-semibold text-gray-700">PRECIO</th>
-            <th class="py-3 px-4 border border-gray-300 text-center font-semibold text-gray-700">ACCIONES</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($lista as $index => $item): 
-            $id = (int)$item['id'];
-            $descripcion = htmlspecialchars($item['descripcion'], ENT_QUOTES, 'UTF-8');
-            $precio = isset($item['precio']) && $item['precio'] > 0 ? number_format((float)$item['precio'], 2, '.', '') : number_format(0.00, 2, '.', '');
-          ?>
-            <tr class="hover:bg-gray-50 border-b border-gray-200">
-              <td class="py-3 px-4 border border-gray-300 text-gray-700"><?= $id ?></td>
-              <td class="py-3 px-4 border border-gray-300 text-gray-700"><?= $descripcion ?></td>
-              <td class="py-3 px-4 border border-gray-300 text-gray-700">S/ <?= $precio ?></td>
-              <td class="py-3 px-4 border border-gray-300 text-center">
-                <button 
-                  onclick="abrirModalPago('<?= $id ?>', '<?= $descripcion ?>', <?= $precio ?>, <?= $id ?>)"
-                  class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium">
-                  <i class="fas fa-credit-card mr-2"></i> Pagar
-                </button>
-              </td>
-            </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
-  </main>
-
-  <!-- Modal de Pago -->
-  <div id="modalPago" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-5xl w-full max-h-[90vh] overflow-y-auto">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
-        
-        <!-- Resumen de pago -->
-        <div class="space-y-6">
-          <div class="flex justify-between items-center">
-            <h2 class="text-2xl font-bold text-gray-800">Resumen de Pago</h2>
-            <button onclick="cerrarModalPago()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-          </div>
-
-          <div class="bg-gray-50 border rounded-2xl p-6 shadow-sm space-y-3">
-            <p class="flex justify-between text-gray-700"><span>Concepto</span><span id="modal-concept-name" class="font-medium">—</span></p>
-            <p class="flex justify-between text-gray-700"><span>Precio</span><span id="modal-precio-value" class="font-medium">S/ 0.00</span></p>
-            
-            <!-- Sección de Descuentos -->
-            <div id="modal-descuentos-section" class="hidden">
-              <div class="border-t pt-3 mt-3">
-                <p class="text-sm font-semibold text-gray-600 mb-2">Descuentos Aplicables:</p>
-                <div id="modal-descuentos-list" class="space-y-1"></div>
-              </div>
+<body class="bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
+  <main class="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+    <!-- Header principal -->
+    <div class="mb-8 animate-fade-in">
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-xl overflow-hidden">
+        <div class="p-6 md:p-8 text-white">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div class="flex-1">
+              <h1 class="text-2xl md:text-3xl font-bold mb-2">Portal de Pagos</h1>
+              <p class="text-blue-100 opacity-90 mb-4">Realiza tus pagos de trámites de forma rápida y segura</p>
+              
+              <?php if ($estudianteBasico): ?>
+                <div class="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-xl p-4 max-w-md">
+                  <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                    <i class="fas fa-user-graduate"></i>
+                  </div>
+                  <div>
+                    <div class="font-semibold"><?= htmlspecialchars($nombreEstudianteSesion, ENT_QUOTES, 'UTF-8') ?></div>
+                    <div class="text-sm text-blue-200">DNI: <?= htmlspecialchars($dniEstudianteSesion, ENT_QUOTES, 'UTF-8') ?></div>
+                  </div>
+                </div>
+              <?php endif; ?>
             </div>
             
-            <p class="flex justify-between text-gray-700"><span>Descuento Total</span><span id="modal-discount-value" class="font-medium text-green-600">S/ 0.00</span></p>
-            <p class="flex justify-between font-semibold text-gray-800 text-lg border-t pt-3"><span>Total a Pagar</span><span id="modal-total-amount" class="text-blue-600">S/ 0.00</span></p>
+            <div class="bg-white/10 backdrop-blur-sm rounded-xl p-5 min-w-[220px]">
+              <div class="text-center">
+                <div class="flex items-center justify-center gap-2 mb-2">
+                  <i class="fas fa-wallet text-2xl opacity-80"></i>
+                  <div>
+                    <div class="text-2xl font-bold"><?= count($lista) ?></div>
+                    <div class="text-sm text-blue-200">Trámites disponibles</div>
+                  </div>
+                </div>
+                <?php if (!$descuentoBloqueado && count($descuentosActivos) > 0): ?>
+                  <div class="text-xs text-emerald-300 bg-emerald-500/20 rounded-lg p-2 mt-2">
+                    <i class="fas fa-tag mr-1"></i>
+                    <?= count($descuentosActivos) ?> descuento(s) disponible(s)
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de trámites/pagos -->
+    <div id="lista-pagos" class="animate-slide-up">
+      <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div class="p-6 border-b border-gray-100">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-gray-800">Trámites Disponibles</h2>
+              <p class="text-gray-600 text-sm">Selecciona el trámite que deseas realizar</p>
+            </div>
+            
+            <?php if ($descuentoBloqueado): ?>
+              <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div class="flex items-center gap-2">
+                  <i class="fas fa-info-circle text-amber-600"></i>
+                  <span class="text-sm text-amber-700">Ya has utilizado tu descuento disponible</span>
+                </div>
+              </div>
+            <?php elseif (!empty($descuentosActivos)): ?>
+              <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <div class="flex items-center gap-2">
+                  <i class="fas fa-tag text-emerald-600"></i>
+                  <span class="text-sm text-emerald-700">Tienes descuentos disponibles</span>
+                </div>
+              </div>
+            <?php endif; ?>
           </div>
         </div>
 
-        <!-- Selección de Método de Pago -->
-        <div class="bg-gray-50 border rounded-3xl p-8 shadow-sm">
-          <h2 class="text-2xl font-bold text-gray-800 text-center mb-6">Selecciona Método de Pago</h2>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">ID</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">TRÁMITE</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">PRECIO</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">DESCUENTO</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">ACCIONES</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <?php foreach ($lista as $index => $item): 
+                $id = (int)$item['id'];
+                $nombre = htmlspecialchars((string)($item['nombre'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $descripcion = htmlspecialchars((string)($item['descripcion'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $precio = isset($item['precio']) && $item['precio'] > 0 ? number_format((float)$item['precio'], 2, '.', '') : number_format(0.00, 2, '.', '');
 
-          <!-- Mensaje de error/success -->
-          <div id="modal-mensaje-pago" class="hidden mb-4 p-4 rounded-lg"></div>
+                $tieneDescuento = false;
+                if (!$descuentoBloqueado && !empty($descuentosActivos)) {
+                  foreach ($descuentosActivos as $d) {
+                    $tipoPagoId = isset($d['tipo_pago_id']) ? (int)$d['tipo_pago_id'] : 0;
+                    $montoRes = isset($d['monto_resolucion']) ? (float)$d['monto_resolucion'] : 0;
+                    if ($montoRes > 0 && ($tipoPagoId === 0 || $tipoPagoId === $id)) {
+                      $tieneDescuento = true;
+                      break;
+                    }
+                  }
+                }
+              ?>
+                <tr class="hover:bg-gray-50 transition-colors">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      #<?= $id ?>
+                    </span>
+                  </td>
+                  <td class="px-6 py-4">
+                    <div class="font-semibold text-gray-900"><?= $nombre ?></div>
+                    <?php if ($descripcion !== ''): ?>
+                      <div class="text-sm text-gray-500 mt-1 max-w-md"><?= $descripcion ?></div>
+                    <?php endif; ?>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-lg font-bold text-gray-900">S/ <?= $precio ?></div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <?php if ($tieneDescuento): ?>
+                      <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border border-emerald-200">
+                        <i class="fas fa-tag text-xs"></i>
+                        Descuento aplicable
+                      </span>
+                    <?php else: ?>
+                      <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+                        Sin descuento
+                      </span>
+                    <?php endif; ?>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <button 
+                      onclick="mostrarResumenPago('<?= $id ?>', '<?= $nombre ?>', <?= $precio ?>, <?= $id ?>)"
+                      class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2">
+                      <i class="fas fa-credit-card"></i>
+                      Pagar ahora
+                    </button>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
 
-          <form id="modal-form-pago" class="space-y-6">
-            <!-- Métodos de pago seleccionables -->
-            <div class="space-y-4">
-              <label class="block text-sm font-medium mb-3 text-gray-700 text-center">Elige tu método de pago preferido</label>
-              
-              <div class="grid grid-cols-1 gap-4">
-                <!-- Opción Yape -->
-                <label class="modal-metodo-pago-option relative flex items-center p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all" data-metodo="yape">
-                  <input type="radio" name="modal_metodo_pago" value="yape" class="sr-only" required>
-                  <div class="flex items-center gap-4 w-full">
-                    <div class="flex-shrink-0">
-                      <img src="../../../assets/img/yape.png" alt="Yape" class="w-20 h-12 object-contain" onerror="this.style.display='none'">
+        <?php if (empty($lista)): ?>
+          <div class="text-center py-12">
+            <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+              <i class="fas fa-credit-card text-gray-400 text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">No hay trámites disponibles</h3>
+            <p class="text-gray-500 max-w-md mx-auto">En este momento no hay trámites disponibles para pago. Intenta más tarde.</p>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <!-- Resumen de pago (oculto por defecto) -->
+    <div id="resumen-pago" class="hidden animate-slide-up">
+      <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-blue-100">
+        <!-- Header del resumen -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 border-b border-blue-100">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
+                <i class="fas fa-file-invoice-dollar text-white"></i>
+              </div>
+              <div>
+                <h2 class="text-xl font-bold text-gray-800">Resumen de Pago</h2>
+                <p class="text-sm text-gray-600">Revisa y confirma los detalles de tu pago</p>
+              </div>
+            </div>
+            <button onclick="volverListaPagos()" 
+                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center gap-2">
+              <i class="fas fa-arrow-left"></i>
+              Volver a trámites
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Panel izquierdo: Resumen del trámite -->
+            <div class="lg:col-span-2">
+              <div class="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                <div class="p-6 border-b border-gray-200">
+                  <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <i class="fas fa-clipboard-list text-blue-600"></i>
+                    Detalles del Trámite
+                  </h3>
+                  
+                  <div class="space-y-4">
+                    <div class="flex justify-between items-center p-4 bg-white rounded-lg border border-gray-100">
+                      <div>
+                        <div class="text-sm text-gray-600">Trámite seleccionado</div>
+                        <div id="resumen-concept" class="font-bold text-gray-800 text-lg">—</div>
+                      </div>
+                      <div class="text-right">
+                        <div class="text-sm text-gray-600">Precio base</div>
+                        <div id="resumen-precio" class="font-bold text-gray-800 text-lg">S/ 0.00</div>
+                      </div>
                     </div>
-                    <div class="flex-1">
-                      <span class="font-semibold text-gray-800">Yape</span>
-                      <p class="text-sm text-gray-600">Pago móvil rápido y seguro</p>
+
+                    <!-- Sección de Descuentos -->
+                    <div id="resumen-descuentos-section" class="hidden">
+                      <div class="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200 p-4">
+                        <h4 class="font-semibold text-emerald-800 mb-3 flex items-center gap-2">
+                          <i class="fas fa-tag"></i>
+                          Descuentos Aplicables
+                        </h4>
+                        <div id="resumen-descuentos-list" class="space-y-2"></div>
+                      </div>
                     </div>
-                    <div class="flex-shrink-0">
-                      <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center modal-metodo-pago-check">
-                        <div class="w-3 h-3 bg-blue-600 rounded-full hidden"></div>
+
+                    <!-- Total a pagar -->
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-4">
+                      <div class="flex justify-between items-center">
+                        <div>
+                          <div class="font-semibold text-gray-800">Total a pagar</div>
+                          <div class="text-sm text-gray-600">Incluye descuentos aplicados</div>
+                        </div>
+                        <div id="resumen-total" class="text-2xl font-bold text-emerald-600">S/ 0.00</div>
                       </div>
                     </div>
                   </div>
-                </label>
+                </div>
 
-                <!-- Opción Plin -->
-                <label class="modal-metodo-pago-option relative flex items-center p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all" data-metodo="plin">
-                  <input type="radio" name="modal_metodo_pago" value="plin" class="sr-only" required>
-                  <div class="flex items-center gap-4 w-full">
-                    <div class="flex-shrink-0">
-                      <img src="../../../assets/img/plin.png" alt="Plin" class="w-20 h-12 object-contain" onerror="this.style.display='none'">
+                <!-- Información del estudiante -->
+                <div class="p-6">
+                  <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <i class="fas fa-user-graduate text-blue-600"></i>
+                    Datos del Estudiante
+                  </h3>
+                  
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">DNI</label>
+                      <div class="flex items-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-lg">
+                        <i class="fas fa-id-card text-gray-400"></i>
+                        <input type="text" id="resumen-dni" value="<?= $dniEstudianteSesion ?>" readonly class="flex-1 bg-transparent outline-none text-gray-800" />
+                      </div>
                     </div>
-                    <div class="flex-1">
-                      <span class="font-semibold text-gray-800">Plin</span>
-                      <p class="text-sm text-gray-600">Pago móvil bancario</p>
-                    </div>
-                    <div class="flex-shrink-0">
-                      <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center modal-metodo-pago-check">
-                        <div class="w-3 h-3 bg-blue-600 rounded-full hidden"></div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Nombre Completo</label>
+                      <div class="flex items-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-lg">
+                        <i class="fas fa-user text-gray-400"></i>
+                        <input type="text" id="resumen-nombre" value="<?= $nombreEstudianteSesion ?>" readonly class="flex-1 bg-transparent outline-none text-gray-800" />
                       </div>
                     </div>
                   </div>
-                </label>
-
-                <!-- Opción Transferencia -->
-                <label class="modal-metodo-pago-option relative flex items-center p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all" data-metodo="transferencia">
-                  <input type="radio" name="modal_metodo_pago" value="transferencia" class="sr-only" required>
-                  <div class="flex items-center gap-4 w-full">
-                    <div class="flex-shrink-0">
-                      <div class="w-20 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-exchange-alt text-white text-2xl"></i>
-                      </div>
-                    </div>
-                    <div class="flex-1">
-                      <span class="font-semibold text-gray-800">Transferencia Bancaria</span>
-                      <p class="text-sm text-gray-600">Transferencia electrónica</p>
-                    </div>
-                    <div class="flex-shrink-0">
-                      <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center modal-metodo-pago-check">
-                        <div class="w-3 h-3 bg-blue-600 rounded-full hidden"></div>
-                      </div>
-                    </div>
-                  </div>
-                </label>
-
-                <!-- Opción Depósito -->
-                <label class="modal-metodo-pago-option relative flex items-center p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all" data-metodo="deposito">
-                  <input type="radio" name="modal_metodo_pago" value="deposito" class="sr-only" required>
-                  <div class="flex items-center gap-4 w-full">
-                    <div class="flex-shrink-0">
-                      <div class="w-20 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-building text-white text-2xl"></i>
-                      </div>
-                    </div>
-                    <div class="flex-1">
-                      <span class="font-semibold text-gray-800">Depósito en Banco</span>
-                      <p class="text-sm text-gray-600">Pago en cuenta bancaria</p>
-                    </div>
-                    <div class="flex-shrink-0">
-                      <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center modal-metodo-pago-check">
-                        <div class="w-3 h-3 bg-blue-600 rounded-full hidden"></div>
-                      </div>
-                    </div>
-                  </div>
-                </label>
-
-                <!-- Opción Efectivo -->
-                <label class="modal-metodo-pago-option relative flex items-center p-4 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all" data-metodo="efectivo">
-                  <input type="radio" name="modal_metodo_pago" value="efectivo" class="sr-only" required>
-                  <div class="flex items-center gap-4 w-full">
-                    <div class="flex-shrink-0">
-                      <div class="w-20 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-money-bill-wave text-white text-2xl"></i>
-                      </div>
-                    </div>
-                    <div class="flex-1">
-                      <span class="font-semibold text-gray-800">Efectivo</span>
-                      <p class="text-sm text-gray-600">Pago físico directo</p>
-                    </div>
-                    <div class="flex-shrink-0">
-                      <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex items-center justify-center modal-metodo-pago-check">
-                        <div class="w-3 h-3 bg-blue-600 rounded-full hidden"></div>
-                      </div>
-                    </div>
-                  </div>
-                </label>
+                </div>
               </div>
             </div>
 
-            <!-- Formulario de datos del estudiante (se muestra después de seleccionar método de pago) -->
-            <div id="formulario-estudiante" class="hidden space-y-4 mt-4 pt-4 border-t">
-              <h3 class="font-semibold text-gray-800 mb-3">Datos del Estudiante</h3>
-              
-              <div>
-                <label class="block text-sm font-medium mb-2 text-gray-700">DNI del Estudiante</label>
-                <div class="relative">
-                  <input 
-                    type="text" 
-                    id="modal-dni-estudiante"
-                    name="dni_estudiante"
-                    maxlength="8"
-                    placeholder="Ingrese DNI (8 dígitos)"
-                    class="w-full border rounded-lg p-3 pr-10 focus:ring-2 focus:ring-blue-400 focus:outline-none shadow-sm transition border-gray-300"
-                    required
-                    oninput="this.value = this.value.replace(/\D/g, '')">
-                  <span id="modal-dni-loader" class="hidden absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <i class="fas fa-spinner fa-spin text-blue-500"></i>
-                  </span>
-                  <span id="modal-dni-check" class="hidden absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <i class="fas fa-check-circle text-green-500"></i>
-                  </span>
+            <!-- Panel derecho: Métodos de pago y confirmación -->
+            <div class="space-y-6">
+              <!-- Métodos de pago -->
+              <div class="bg-white rounded-xl border border-gray-200 p-6">
+                <h3 class="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <i class="fas fa-credit-card text-blue-600"></i>
+                  Método de Pago
+                </h3>
+                
+                <div class="space-y-3" id="metodos-pago-container">
+                  <?php foreach ($metodosPago as $metodo): ?>
+                    <label class="method-card flex items-center gap-3 p-4 border border-gray-300 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md">
+                      <input type="radio" name="metodo_pago" value="<?= (int)$metodo['id'] ?>" class="w-5 h-5 text-blue-600" required>
+                      <div class="flex-1">
+                        <div class="font-medium text-gray-800"><?= htmlspecialchars($metodo['nombre']) ?></div>
+                        <div class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($metodo['descripcion'] ?? '') ?></div>
+                      </div>
+                      <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <i class="fas fa-wallet text-blue-600"></i>
+                      </div>
+                    </label>
+                  <?php endforeach; ?>
+                </div>
+
+                <!-- Botón de confirmación -->
+                <div class="mt-6">
+                  <button type="button" onclick="procesarPago()" 
+                          id="btn-procesar-pago"
+                          class="w-full px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 glow-effect flex items-center justify-center gap-3">
+                    <i class="fas fa-lock"></i>
+                    Confirmar y Pagar
+                    <span id="resumen-total-btn" class="font-bold">S/ 0.00</span>
+                  </button>
+                  
+                  <p class="text-xs text-gray-500 text-center mt-3">
+                    <i class="fas fa-shield-alt mr-1"></i>
+                    Tu pago está protegido con encriptación SSL
+                  </p>
                 </div>
               </div>
 
-              <div>
-                <label class="block text-sm font-medium mb-2 text-gray-700">Nombre Completo</label>
-                <input 
-                  type="text" 
-                  id="modal-nombre-estudiante"
-                  name="nombre_estudiante"
-                  placeholder="Nombre completo del estudiante"
-                  class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-blue-400 focus:outline-none shadow-sm transition border-gray-300"
-                  required>
+              <!-- Información adicional -->
+              <div class="bg-blue-50 rounded-xl border border-blue-200 p-4">
+                <div class="flex items-start gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-600"></i>
+                  </div>
+                  <div class="text-sm text-blue-800">
+                    <div class="font-semibold mb-1">Información importante</div>
+                    <ul class="list-disc list-inside space-y-1">
+                      <li>Recibirás un comprobante por email</li>
+                      <li>El procesamiento toma 1-2 minutos</li>
+                      <li>Guarda tu número de operación</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
 
-            <button type="submit" id="modal-pay-button" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold px-6 py-3 rounded-xl w-full mt-4 transition shadow-md hover:shadow-lg flex items-center justify-center gap-2">
-              <span id="modal-pay-button-text">
-                <i class="fas fa-credit-card"></i> Pagar: <span id="modal-pay-amount">S/ 0.00</span>
-              </span>
-              <span id="modal-pay-button-loading" class="hidden">
-                <i class="fas fa-spinner fa-spin"></i> Procesando...
-              </span>
-            </button>
-          </form>
-
-          <p class="text-gray-500 text-sm text-center mt-6">
-            Al continuar, aceptas nuestros <a href="#" class="text-blue-600 underline hover:text-blue-800">Términos y Condiciones</a> y <a href="#" class="text-blue-600 underline hover:text-blue-800">Política de Privacidad</a>.
-          </p>
+          <!-- Mensaje de resultado -->
+          <div id="resumen-mensaje" class="hidden mt-6"></div>
         </div>
-
       </div>
     </div>
-  </div>
-
-  <style>
-    .modal-metodo-pago-option.selected {
-      border-color: #2563eb !important;
-      background-color: #eff6ff !important;
-    }
-    .modal-metodo-pago-option.selected .modal-metodo-pago-check {
-      border-color: #2563eb !important;
-    }
-    .modal-metodo-pago-option.selected .modal-metodo-pago-check > div {
-      display: block !important;
-    }
-  </style>
+  </main>
 
   <script>
     let pagoActual = { numero: '', concepto: '', precio: 0, id: 0 };
+    let montoDescuentoGlobal = 0;
+    const descuentoBloqueado = <?php echo json_encode($descuentoBloqueado); ?>;
 
-    // Filtro de búsqueda
+    // Configurar selección de métodos de pago
     document.addEventListener('DOMContentLoaded', function() {
-      const filtroBusqueda = document.getElementById('filtroBusqueda');
-      const btnLimpiar = document.getElementById('btnLimpiarFiltro');
-      const tarjetas = document.querySelectorAll('.concepto-card');
-
-      function filtrarTarjetas() {
-        const texto = filtroBusqueda.value.toLowerCase();
-        tarjetas.forEach(tarjeta => {
-          const textoTarjeta = tarjeta.textContent.toLowerCase();
-          tarjeta.style.display = textoTarjeta.includes(texto) ? '' : 'none';
+      const methodCards = document.querySelectorAll('.method-card');
+      methodCards.forEach(card => {
+        const radio = card.querySelector('input[type="radio"]');
+        radio.addEventListener('change', function() {
+          methodCards.forEach(c => c.classList.remove('selected'));
+          if (this.checked) {
+            card.classList.add('selected');
+          }
         });
-      }
-
-      if (filtroBusqueda) {
-        filtroBusqueda.addEventListener('input', filtrarTarjetas);
-      }
-
-      if (btnLimpiar) {
-        btnLimpiar.addEventListener('click', function() {
-          filtroBusqueda.value = '';
-          tarjetas.forEach(tarjeta => tarjeta.style.display = '');
-        });
-      }
+      });
     });
 
-    function abrirModalPago(numero, concepto, precio, id) {
+    function mostrarResumenPago(numero, concepto, precio, id) {
       pagoActual = { numero, concepto, precio: parseFloat(precio), id: parseInt(id) };
       
-      // El monto total es el precio
       const montoTotal = pagoActual.precio;
-      
-      // Calcular descuentos
       const descuentos = <?php echo json_encode($descuentosActivos); ?>;
       let montoDescuento = 0;
       let descuentoDetalles = [];
       
-      if (descuentos && descuentos.length > 0) {
-        console.log('Descuentos encontrados:', descuentos);
+      // Calcular descuentos
+      if (!descuentoBloqueado && descuentos && descuentos.length > 0) {
+        const aplicables = descuentos.filter(d => !d.tipo_pago_id || parseInt(d.tipo_pago_id) === pagoActual.id);
+        const montoFijo = aplicables.length > 0
+          ? Math.max(...aplicables.map(d => parseFloat(d.monto_resolucion || 0)))
+          : 0;
+        montoDescuento = Math.min(montoTotal, Math.max(0, montoFijo));
         
-        // Aplicar el descuento más alto (o sumar si se permite múltiples)
-        const porcentajeDescuento = Math.max(...descuentos.map(d => parseFloat(d.porcentaje_descuento)));
-        montoDescuento = montoTotal * (porcentajeDescuento / 100);
-        
-        console.log('Porcentaje descuento:', porcentajeDescuento);
-        console.log('Monto total:', montoTotal);
-        console.log('Monto descuento:', montoDescuento);
-        
-        // Preparar detalles para mostrar
-        descuentoDetalles = descuentos.map(d => ({
+        descuentoDetalles = aplicables.map(d => ({
           resolucion: d.numero_resolucion,
           titulo: d.titulo,
-          porcentaje: parseFloat(d.porcentaje_descuento),
-          monto: montoTotal * (parseFloat(d.porcentaje_descuento) / 100)
+          monto: Math.min(montoTotal, Math.max(0, parseFloat(d.monto_resolucion || 0)))
         }));
         
         // Mostrar sección de descuentos
-        const descuentosSection = document.getElementById('modal-descuentos-section');
-        const descuentosList = document.getElementById('modal-descuentos-list');
+        const descuentosSection = document.getElementById('resumen-descuentos-section');
+        const descuentosList = document.getElementById('resumen-descuentos-list');
         
         descuentosSection.classList.remove('hidden');
         descuentosList.innerHTML = descuentoDetalles.map(d => 
-          `<div class="flex justify-between text-sm">
-            <span class="text-gray-600">${d.resolucion} - ${d.titulo} (${d.porcentaje}%)</span>
-            <span class="text-green-600">-S/ ${d.monto.toFixed(2)}</span>
+          `<div class="flex items-center justify-between p-2 bg-white rounded border border-emerald-100">
+            <div>
+              <div class="text-xs text-emerald-700 font-medium">${d.resolucion}</div>
+              <div class="text-xs text-gray-600 truncate max-w-[200px]">${d.titulo}</div>
+            </div>
+            <div class="text-sm font-bold text-emerald-600">-S/ ${d.monto.toFixed(2)}</div>
           </div>`
         ).join('');
       } else {
-        // Ocultar sección de descuentos
-        document.getElementById('modal-descuentos-section').classList.add('hidden');
+        document.getElementById('resumen-descuentos-section').classList.add('hidden');
       }
       
+      montoDescuentoGlobal = montoDescuento;
       const montoFinal = montoTotal - montoDescuento;
       
-      // Actualizar datos del modal
-      document.getElementById('modal-concept-name').textContent = concepto;
-      document.getElementById('modal-precio-value').textContent = 'S/ ' + montoTotal.toFixed(2);
-      document.getElementById('modal-discount-value').textContent = 'S/ ' + montoDescuento.toFixed(2);
-      document.getElementById('modal-total-amount').textContent = 'S/ ' + montoFinal.toFixed(2);
-      document.getElementById('modal-pay-amount').textContent = 'S/ ' + montoFinal.toFixed(2);
+      // Actualizar datos del resumen
+      document.getElementById('resumen-concept').textContent = concepto;
+      document.getElementById('resumen-precio').textContent = 'S/ ' + montoTotal.toFixed(2);
+      document.getElementById('resumen-total').textContent = 'S/ ' + montoFinal.toFixed(2);
+      document.getElementById('resumen-total-btn').textContent = 'S/ ' + montoFinal.toFixed(2);
       
-      // Limpiar formulario
-      document.getElementById('modal-form-pago').reset();
-      document.getElementById('modal-mensaje-pago').classList.add('hidden');
-      document.getElementById('formulario-estudiante').classList.add('hidden');
-      const metodoOptions = document.querySelectorAll('.modal-metodo-pago-option');
-      metodoOptions.forEach(opt => {
-        opt.classList.remove('selected');
-        const check = opt.querySelector('.modal-metodo-pago-check > div');
-        if (check) check.classList.add('hidden');
-      });
+      // Scroll suave y mostrar resumen
+      document.getElementById('lista-pagos').classList.add('hidden');
+      const resumenSection = document.getElementById('resumen-pago');
+      resumenSection.classList.remove('hidden');
+      resumenSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       
-      // Mostrar modal
-      document.getElementById('modalPago').classList.remove('hidden');
+      // Resetear formulario
+      document.querySelectorAll('.method-card').forEach(card => card.classList.remove('selected'));
+      document.querySelectorAll('input[name="metodo_pago"]').forEach(radio => radio.checked = false);
+      document.getElementById('resumen-mensaje').classList.add('hidden');
     }
 
-    function cerrarModalPago() {
-      document.getElementById('modalPago').classList.add('hidden');
-      document.getElementById('modal-form-pago').reset();
-      document.getElementById('modal-mensaje-pago').classList.add('hidden');
-      document.getElementById('formulario-estudiante').classList.add('hidden');
+    function volverListaPagos() {
+      document.getElementById('resumen-pago').classList.add('hidden');
+      document.getElementById('lista-pagos').classList.remove('hidden');
+      document.getElementById('lista-pagos').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // Manejar selección de método de pago en el modal
-    document.addEventListener('DOMContentLoaded', function() {
-      const metodoOptions = document.querySelectorAll('.modal-metodo-pago-option');
-      metodoOptions.forEach(option => {
-        const radio = option.querySelector('input[type="radio"]');
-        
-        radio.addEventListener('change', function() {
-          metodoOptions.forEach(opt => {
-            opt.classList.remove('selected');
-            const check = opt.querySelector('.modal-metodo-pago-check > div');
-            if (check) check.classList.add('hidden');
-          });
-          
-          if (radio.checked) {
-            option.classList.add('selected');
-            const check = option.querySelector('.modal-metodo-pago-check > div');
-            if (check) check.classList.remove('hidden');
+    function mostrarMensaje(mensaje, tipo) {
+      const mensajeDiv = document.getElementById('resumen-mensaje');
+      mensajeDiv.innerHTML = `
+        <div class="p-4 rounded-xl border ${tipo === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}">
+          <div class="flex items-center gap-3">
+            <i class="fas ${tipo === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} text-lg"></i>
+            <div>
+              <div class="font-semibold">${tipo === 'success' ? '¡Éxito!' : 'Error'}</div>
+              <div class="text-sm mt-1">${mensaje}</div>
+            </div>
+          </div>
+        </div>
+      `;
+      mensajeDiv.classList.remove('hidden');
+    }
+
+    function procesarPago() {
+      const metodoPago = document.querySelector('input[name="metodo_pago"]:checked');
+      if (!metodoPago) {
+        mostrarMensaje('Por favor, selecciona un método de pago.', 'error');
+        return;
+      }
+      
+      const montoFinal = parseFloat(pagoActual.precio) - montoDescuentoGlobal;
+      const submitButton = document.getElementById('btn-procesar-pago');
+      const originalContent = submitButton.innerHTML;
+      
+      submitButton.disabled = true;
+      submitButton.innerHTML = `
+        <div class="flex items-center gap-3">
+          <div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          <span>Procesando pago...</span>
+        </div>
+      `;
+      submitButton.classList.remove('glow-effect');
+      
+      // Calcular ruta correcta
+      const currentPath = window.location.pathname;
+      let apiPath = currentPath.includes('/views/') ? '../controller/procesarPago.php' : '../../controller/procesarPago.php';
+      
+      const formData = new FormData();
+      formData.append('numero_pago', pagoActual.numero);
+      formData.append('concepto', pagoActual.concepto);
+      formData.append('precio', pagoActual.precio);
+      formData.append('metodo_pago', metodoPago.value);
+      formData.append('dni_estudiante', document.getElementById('resumen-dni').value);
+      formData.append('nombre_estudiante', document.getElementById('resumen-nombre').value);
+      formData.append('monto_descuento', montoDescuentoGlobal);
+      formData.append('monto_total', montoFinal);
+      
+      fetch(apiPath, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Error en la respuesta del servidor');
+        return response.json();
+      })
+      .then(data => {
+        if (data.success) {
+          mostrarMensaje('¡Pago registrado correctamente! Redirigiendo...', 'success');
+          // Mostrar detalles del pago exitoso
+          setTimeout(() => {
+            const confirmMessage = `
+              <div class="bg-white rounded-xl border border-emerald-200 p-6 mt-4">
+                <div class="text-center">
+                  <div class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-check text-emerald-600 text-2xl"></i>
+                  </div>
+                  <h3 class="text-lg font-bold text-gray-800 mb-2">¡Pago Completado!</h3>
+                  <p class="text-gray-600 mb-4">Tu pago ha sido procesado exitosamente</p>
+                  <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                      <div class="text-gray-600">Trámite:</div>
+                      <div class="font-medium text-gray-800">${pagoActual.concepto}</div>
+                      <div class="text-gray-600">Monto:</div>
+                      <div class="font-bold text-emerald-600">S/ ${montoFinal.toFixed(2)}</div>
+                      <div class="text-gray-600">Método:</div>
+                      <div class="font-medium text-gray-800">${metodoPago.parentElement.querySelector('.font-medium').textContent}</div>
+                    </div>
+                  </div>
+                  <p class="text-xs text-gray-500">Redirigiendo a la página principal...</p>
+                </div>
+              </div>
+            `;
+            document.getElementById('resumen-mensaje').innerHTML = confirmMessage;
             
-            // Mostrar formulario de estudiante cuando se selecciona un método de pago
-            document.getElementById('formulario-estudiante').classList.remove('hidden');
-          }
-        });
-        
-        option.addEventListener('click', function(e) {
-          if (e.target.tagName !== 'INPUT') {
-            radio.checked = true;
-            radio.dispatchEvent(new Event('change'));
-          }
-        });
-      });
-
-      // Manejar envío del formulario
-      const formPago = document.getElementById('modal-form-pago');
-      if (formPago) {
-        formPago.addEventListener('submit', async function(e) {
-          e.preventDefault();
-          
-          const metodoPago = document.querySelector('input[name="modal_metodo_pago"]:checked');
-          const mensajePago = document.getElementById('modal-mensaje-pago');
-          const payButton = document.getElementById('modal-pay-button');
-          const payButtonText = document.getElementById('modal-pay-button-text');
-          const payButtonLoading = document.getElementById('modal-pay-button-loading');
-          
-          function mostrarMensaje(texto, tipo = 'error') {
-            mensajePago.className = `mb-4 p-4 rounded-lg ${tipo === 'error' ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`;
-            mensajePago.innerHTML = `<i class="fas ${tipo === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} mr-2"></i>${texto}`;
-            mensajePago.classList.remove('hidden');
-          }
-
-          if (!metodoPago) {
-            mostrarMensaje('Por favor, selecciona un método de pago', 'error');
-            return;
-          }
-
-          // Validar datos del estudiante
-          const dniEstudiante = document.getElementById('modal-dni-estudiante').value.trim();
-          const nombreEstudiante = document.getElementById('modal-nombre-estudiante').value.trim();
-
-          if (!dniEstudiante || dniEstudiante.length !== 8) {
-            mostrarMensaje('Por favor, ingrese un DNI válido (8 dígitos)', 'error');
-            return;
-          }
-
-          if (!nombreEstudiante || nombreEstudiante.length < 3) {
-            mostrarMensaje('Por favor, ingrese el nombre completo del estudiante', 'error');
-            return;
-          }
-
-          // El monto es el precio
-          const monto = pagoActual.precio;
-          
-          // Calcular descuento
-          const descuentos = <?php echo json_encode($descuentosActivos); ?>;
-          let montoDescuento = 0;
-          
-          if (descuentos && descuentos.length > 0) {
-            const porcentajeDescuento = Math.max(...descuentos.map(d => parseFloat(d.porcentaje_descuento)));
-            montoDescuento = monto * (porcentajeDescuento / 100);
-          }
-          
-          if (monto <= 0) {
-            mostrarMensaje('El monto debe ser mayor a cero', 'error');
-            return;
-          }
-
-          // Deshabilitar botón y mostrar loading
-          payButton.disabled = true;
-          payButtonText.classList.add('hidden');
-          payButtonLoading.classList.remove('hidden');
-
-          // Determinar ruta del controlador
-          const currentPath = window.location.pathname;
-          let baseUrl = '';
-          if (currentPath.includes('/views/')) {
-            baseUrl = currentPath.substring(0, currentPath.indexOf('/views/'));
-          }
-
-          try {
-            const response = await fetch(baseUrl + '/controller/procesarPago.php', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                concepto: pagoActual.concepto,
-                monto: monto,
-                monto_descuento: montoDescuento,
-                metodo_pago: metodoPago.value,
-                tipo_pago_id: pagoActual.id,
-                numero: pagoActual.numero,
-                precio: pagoActual.precio,
-                dni_estudiante: dniEstudiante,
-                nombre_estudiante: nombreEstudiante
-              })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-              mostrarMensaje(data.message || 'Pago procesado correctamente. Redirigiendo...', 'success');
-              setTimeout(() => {
-                if (data.redirect) {
-                  window.location.href = data.redirect;
-                } else {
-                  window.location.href = window.location.href.split('?')[0] + '?pagina=comprobantes';
-                }
-              }, 2000);
-            } else {
-              mostrarMensaje(data.error || 'Error al procesar el pago', 'error');
-              payButton.disabled = false;
-              payButtonText.classList.remove('hidden');
-              payButtonLoading.classList.add('hidden');
-            }
-          } catch (error) {
-            console.error('Error:', error);
-            mostrarMensaje('Error de conexión. Por favor, intente nuevamente.', 'error');
-            payButton.disabled = false;
-            payButtonText.classList.remove('hidden');
-            payButtonLoading.classList.add('hidden');
-          }
-        });
-      }
-
-      // Cerrar modal al hacer clic fuera de él
-      document.getElementById('modalPago').addEventListener('click', function(e) {
-        if (e.target.id === 'modalPago') {
-          cerrarModalPago();
-        }
-      });
-
-      // Autocompletar nombre cuando se ingresa DNI válido
-      const modalDniInput = document.getElementById('modal-dni-estudiante');
-      const modalNombreInput = document.getElementById('modal-nombre-estudiante');
-      const modalDniLoader = document.getElementById('modal-dni-loader');
-      const modalDniCheck = document.getElementById('modal-dni-check');
-      
-      if (modalDniInput) {
-        modalDniInput.addEventListener('input', function(e) {
-          const dni = e.target.value.trim();
-          
-          // Si se ingresaron 8 dígitos, buscar estudiante
-          if (dni.length === 8) {
-            buscarEstudiantePorDNI(dni);
-          } else if (dni.length < 8) {
-            // Limpiar nombre si se borra el DNI
-            modalNombreInput.value = '';
-            modalDniLoader.classList.add('hidden');
-            modalDniCheck.classList.add('hidden');
-            modalDniInput.style.borderColor = '';
-            modalNombreInput.style.borderColor = '';
-          }
-        });
-      }
-
-      function buscarEstudiantePorDNI(dni) {
-        // Mostrar indicador de carga
-        modalDniInput.disabled = true;
-        modalDniInput.style.backgroundColor = '#f3f4f6';
-        modalDniLoader.classList.remove('hidden');
-        modalDniCheck.classList.add('hidden');
-        
-        // Calcular ruta correcta según la ubicación actual
-        const currentPath = window.location.pathname;
-        let apiPath;
-        
-        if (currentPath.includes('/views/')) {
-          apiPath = '../controller/buscarEstudianteSolicitud.php';
+            // Redirigir después de mostrar confirmación
+            setTimeout(() => {
+              window.location.reload();
+            }, 3000);
+          }, 500);
         } else {
-          apiPath = '../../controller/buscarEstudianteSolicitud.php';
+          mostrarMensaje(data.message || 'Error al procesar el pago.', 'error');
+          submitButton.classList.add('glow-effect');
         }
-        
-        fetch(`${apiPath}?dni=${dni}`)
-          .then(response => response.json())
-          .then(data => {
-            if (data.success && data.estudiante) {
-              // Autocompletar nombre completo
-              modalNombreInput.value = data.estudiante.nombre_completo || '';
-              
-              // Mostrar check de éxito
-              modalDniLoader.classList.add('hidden');
-              modalDniCheck.classList.remove('hidden');
-              
-              // Estilo visual de éxito
-              modalNombreInput.style.borderColor = '#10b981';
-              modalDniInput.style.borderColor = '#10b981';
-              
-              // Remover estilo después de 2 segundos
-              setTimeout(() => {
-                modalNombreInput.style.borderColor = '';
-                modalDniInput.style.borderColor = '';
-                modalDniCheck.classList.add('hidden');
-              }, 2000);
-            } else {
-              // Limpiar nombre si no se encontró
-              modalNombreInput.value = '';
-              modalDniLoader.classList.add('hidden');
-              modalDniCheck.classList.add('hidden');
-              
-              // Opcional: mostrar mensaje de advertencia
-              // console.log('Estudiante no encontrado');
-            }
-          })
-          .catch(error => {
-            console.error('Error al buscar estudiante:', error);
-            modalNombreInput.value = '';
-            modalDniLoader.classList.add('hidden');
-            modalDniCheck.classList.add('hidden');
-          })
-          .finally(() => {
-            // Rehabilitar campo DNI
-            modalDniInput.disabled = false;
-            modalDniInput.style.backgroundColor = '';
-          });
-      }
-    });
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        mostrarMensaje('Error de conexión. Por favor, verifica tu conexión a internet.', 'error');
+        submitButton.classList.add('glow-effect');
+      })
+      .finally(() => {
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalContent;
+      });
+    }
   </script>
 </body>
 </html>

@@ -16,20 +16,43 @@ class GuardarSolicitudController {
 
         try {
 
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                session_start();
+            }
+
+            $sessionUser = (string)($_SESSION['usuario'] ?? '');
+            if ($sessionUser === '' || !preg_match('/^(\d{8})@institutocajas\.edu\.pe$/', $sessionUser, $m)) {
+                throw new Exception('Sesión inválida');
+            }
+
+            $dniSesion = $m[1];
+
             if (
-                empty($datos['dni']) ||
-                empty($datos['nombre']) ||
                 empty($datos['telefono']) ||
                 empty($datos['tipo']) || // id de resolución seleccionada
-                empty($datos['fecha']) ||
                 empty($datos['descripcion'])
             ) {
                 throw new Exception("Campos incompletos");
             }
 
+            $telefono = preg_replace('/\D/', '', (string)$datos['telefono']);
+            if (!preg_match('/^9\d{8}$/', $telefono)) {
+                throw new Exception('Teléfono inválido');
+            }
+
+            $descripcion = trim((string)$datos['descripcion']);
+            if (mb_strlen($descripcion) < 10) {
+                throw new Exception('Descripción muy corta');
+            }
+
+            $resolucionId = (int)$datos['tipo'];
+            if ($resolucionId <= 0) {
+                throw new Exception('Resolución inválida');
+            }
+
             // Buscar ID de estudiante por DNI
             $stmtEst = $this->db->prepare("SELECT id FROM estudiante WHERE dni_est = :dni LIMIT 1");
-            $stmtEst->execute([':dni' => trim($datos['dni'])]);
+            $stmtEst->execute([':dni' => $dniSesion]);
             $est = $stmtEst->fetch(PDO::FETCH_ASSOC);
 
             if (!$est) {
@@ -37,6 +60,19 @@ class GuardarSolicitudController {
             }
 
             $estudianteId = (int)$est['id'];
+
+            // Validar que la resolución exista y esté vigente/activa
+            $stmtRes = $this->db->prepare("SELECT id
+                FROM resoluciones
+                WHERE id = :id
+                  AND estado = true
+                  AND (fecha_inicio IS NULL OR fecha_inicio <= CURDATE())
+                  AND (fecha_fin IS NULL OR fecha_fin >= CURDATE())
+                LIMIT 1");
+            $stmtRes->execute([':id' => $resolucionId]);
+            if (!$stmtRes->fetchColumn()) {
+                throw new Exception('La resolución seleccionada no está disponible');
+            }
 
             // Archivos de evidencia (se guardan en columna foto)
             $archivos = $this->subirArchivos();
@@ -48,10 +84,10 @@ class GuardarSolicitudController {
 
             $params = [
                 ':estudiante'      => $estudianteId,
-                ':resoluciones'    => (int)$datos['tipo'], // id de la resolución seleccionada
+                ':resoluciones'    => $resolucionId, // id de la resolución seleccionada
                 ':tipo_solicitud'  => 'Descuento',         // etiqueta general, puedes cambiarla luego
-                ':descripcion'     => trim($datos['descripcion']),
-                ':fecha_solicitud' => $datos['fecha'],
+                ':descripcion'     => $descripcion,
+                ':fecha_solicitud' => date('Y-m-d H:i:s'),
                 ':foto'            => $archivos
             ];
 
@@ -69,14 +105,40 @@ class GuardarSolicitudController {
 
         if (empty($_FILES['archivo']['name'][0])) return '';
 
+        if (!isset($_FILES['archivo']['name']) || !is_array($_FILES['archivo']['name'])) {
+            return '';
+        }
+
+        if (count($_FILES['archivo']['name']) > 5) {
+            throw new Exception('Máximo 5 archivos');
+        }
+
         $carpeta = "../uploads/solicitudes/";
         if (!file_exists($carpeta)) mkdir($carpeta,0777,true);
 
         $lista = [];
 
+        $allowedTypes = [
+            'image/jpeg',
+            'image/png',
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
+
         foreach ($_FILES['archivo']['name'] as $i=>$nombre){
 
             if ($_FILES['archivo']['error'][$i]==0){
+
+                $size = (int)($_FILES['archivo']['size'][$i] ?? 0);
+                if ($size > 5 * 1024 * 1024) {
+                    throw new Exception('Un archivo excede 5MB');
+                }
+
+                $type = (string)($_FILES['archivo']['type'][$i] ?? '');
+                if (!in_array($type, $allowedTypes, true)) {
+                    throw new Exception('Tipo de archivo no permitido');
+                }
 
                 $nuevo = uniqid()."_".basename($nombre);
                 $destino = $carpeta.$nuevo;
