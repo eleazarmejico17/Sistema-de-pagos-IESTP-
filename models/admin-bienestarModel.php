@@ -22,6 +22,13 @@ class Empleado {
                 foto_emp,
                 estado
             FROM empleado
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM usuarios u
+                WHERE u.estuempleado = empleado.id
+                  AND u.tipo IN (1,4,5)
+                LIMIT 1
+            )
             ORDER BY id DESC
         ");
 

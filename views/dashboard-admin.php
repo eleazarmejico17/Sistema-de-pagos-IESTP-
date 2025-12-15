@@ -201,138 +201,313 @@ if (isset($_GET['delete']) && isset($_GET['pagina']) && $_GET['pagina'] === 'usu
     }
 }
 
-// Procesar acciones de admin-tipo-pago ANTES de cualquier output
-if (isset($_GET['pagina']) && $_GET['pagina'] === 'admin-tipo-pago') {
+// Procesar acciones de admin-caja ANTES de cualquier output
+if (isset($_GET['pagina']) && $_GET['pagina'] === 'admin-caja') {
     require_once __DIR__ . '/../config/conexion.php';
     require_once __DIR__ . '/../controller/NotificacionHelper.php';
     $pdo = Conexion::getInstance()->getConnection();
 
-    // CREAR
-    if (isset($_POST['accion']) && $_POST['accion'] === "crear") {
-        try {
-            $uit = isset($_POST['uit']) ? (float)$_POST['uit'] : 0.00;
+    $redirectUrl = 'dashboard-admin.php?pagina=admin-caja';
 
-            $stmt = $pdo->prepare("INSERT INTO tipo_pago (nombre, descripcion, uit) VALUES (:nombre, :descripcion, :uit)");
-            $stmt->execute([
-                ":nombre"      => $_POST['nombre'],
-                ":descripcion" => $_POST['descripcion'],
-                ":uit"         => $uit
-            ]);
-
-            // Crear notificación
-            NotificacionHelper::crear('crear', 'tipo_pago', [
-                'nombre' => $_POST['nombre'],
-                'descripcion' => $_POST['descripcion'] ?? '',
-                'uit' => $uit
-            ]);
-
-            header("Location: dashboard-admin.php?pagina=admin-tipo-pago&msg=creado");
-            exit;
-        } catch (Exception $e) {
-            header("Location: dashboard-admin.php?pagina=admin-tipo-pago&msg=error");
-            exit;
-        }
+    // CRUD tipo_pago (usa precio)
+    try {
+        $stmtColumns = $pdo->query('SHOW COLUMNS FROM tipo_pago');
+        $tipoPagoColumns = $stmtColumns->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) {
+        $tipoPagoColumns = [];
     }
 
-    // EDITAR
-    if (isset($_POST['accion']) && $_POST['accion'] === "editar") {
-        try {
-            $uit = isset($_POST['uit']) ? (float)$_POST['uit'] : 0.00;
+    $hasPrecio = in_array('precio', $tipoPagoColumns, true);
 
-            $stmt = $pdo->prepare("UPDATE tipo_pago SET nombre=:nombre, descripcion=:descripcion, uit=:uit WHERE id=:id");
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && in_array($_POST['accion'], ['crear', 'editar'], true) && isset($_POST['nombre'])) {
+        try {
+            $accion = (string)$_POST['accion'];
+            $nombre = trim((string)($_POST['nombre'] ?? ''));
+            $descripcion = trim((string)($_POST['descripcion'] ?? ''));
+            $precio = isset($_POST['precio']) ? (float)$_POST['precio'] : 0.00;
+
+            if ($nombre === '') {
+                throw new Exception('El nombre es obligatorio');
+            }
+
+            if ($accion === 'crear') {
+                if (!$hasPrecio) {
+                    throw new Exception('La columna precio no existe en tipo_pago');
+                }
+
+                $stmt = $pdo->prepare('INSERT INTO tipo_pago (nombre, descripcion, precio) VALUES (:nombre, :descripcion, :precio)');
+                $stmt->execute([
+                    ':nombre' => $nombre,
+                    ':descripcion' => $descripcion,
+                    ':precio' => $precio,
+                ]);
+
+                NotificacionHelper::crear('crear', 'tipo_pago', [
+                    'nombre' => $nombre,
+                    'descripcion' => $descripcion,
+                    'precio' => $precio,
+                ]);
+
+                header('Location: ' . $redirectUrl . '&msg=creado');
+                exit;
+            }
+
+            $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+            if ($id <= 0) {
+                throw new Exception('ID inválido');
+            }
+
+            if (!$hasPrecio) {
+                throw new Exception('La columna precio no existe en tipo_pago');
+            }
+
+            $stmt = $pdo->prepare('UPDATE tipo_pago SET nombre = :nombre, descripcion = :descripcion, precio = :precio WHERE id = :id');
             $stmt->execute([
-                ":id"          => $_POST['id'],
-                ":nombre"      => $_POST['nombre'],
-                ":descripcion" => $_POST['descripcion'],
-                ":uit"         => $uit
+                ':id' => $id,
+                ':nombre' => $nombre,
+                ':descripcion' => $descripcion,
+                ':precio' => $precio,
             ]);
 
-            // Crear notificación
             NotificacionHelper::crear('editar', 'tipo_pago', [
-                'id' => $_POST['id'],
-                'nombre' => $_POST['nombre'],
-                'descripcion' => $_POST['descripcion'] ?? '',
-                'uit' => $uit
+                'id' => $id,
+                'nombre' => $nombre,
+                'descripcion' => $descripcion,
+                'precio' => $precio
             ]);
 
-            header("Location: dashboard-admin.php?pagina=admin-tipo-pago&msg=actualizado");
+            header('Location: ' . $redirectUrl . '&msg=actualizado');
             exit;
-        } catch (Exception $e) {
-            header("Location: dashboard-admin.php?pagina=admin-tipo-pago&msg=error");
+        } catch (Throwable $e) {
+            header('Location: ' . $redirectUrl . '&msg=error&detalle=' . urlencode($e->getMessage()));
             exit;
         }
     }
 
-    // ELIMINAR
-    if (isset($_GET['eliminar'])) {
+    if (isset($_GET['eliminar_tipo_pago'])) {
         try {
-            // Validar que el ID sea un número válido
-            $id = filter_var($_GET['eliminar'], FILTER_VALIDATE_INT);
+            $id = filter_var($_GET['eliminar_tipo_pago'], FILTER_VALIDATE_INT);
             if (!$id) {
-                throw new Exception("ID inválido");
+                throw new Exception('ID inválido');
             }
 
-            // Verificar si el tipo de pago existe
-            $stmtGet = $pdo->prepare("SELECT id, nombre, descripcion FROM tipo_pago WHERE id = :id LIMIT 1");
-            $stmtGet->execute([":id" => $id]);
+            $stmtGet = $pdo->prepare('SELECT id, nombre, descripcion FROM tipo_pago WHERE id = :id LIMIT 1');
+            $stmtGet->execute([':id' => $id]);
             $tipoPago = $stmtGet->fetch(PDO::FETCH_ASSOC);
-
             if (!$tipoPago) {
-                throw new Exception("El tipo de pago no existe");
+                throw new Exception('El tipo de pago no existe');
             }
 
-            // Verificar si hay referencias en otras tablas
-            $stmtCheck = $pdo->prepare("SELECT COUNT(*) as count FROM pagos WHERE tipo_pago = :id");
-            $stmtCheck->execute([":id" => $id]);
-            $referencias = $stmtCheck->fetch(PDO::FETCH_ASSOC)['count'];
-
+            $stmtCheck = $pdo->prepare('SELECT COUNT(*) as count FROM pagos WHERE tipo_pago = :id');
+            $stmtCheck->execute([':id' => $id]);
+            $referencias = (int)($stmtCheck->fetch(PDO::FETCH_ASSOC)['count'] ?? 0);
             if ($referencias > 0) {
-                throw new Exception("No se puede eliminar este tipo de pago porque está siendo usado en {$referencias} pago(s)");
+                throw new Exception('No se puede eliminar este tipo de pago porque está siendo usado en ' . $referencias . ' pago(s)');
             }
 
-            // Eliminar
-            $stmt = $pdo->prepare("DELETE FROM tipo_pago WHERE id = :id");
-            $result = $stmt->execute([":id" => $id]);
+            $stmt = $pdo->prepare('DELETE FROM tipo_pago WHERE id = :id');
+            $stmt->execute([':id' => $id]);
 
-            if (!$result) {
-                throw new Exception("No se pudo eliminar el registro");
-            }
-
-            // Crear notificación
             NotificacionHelper::crear('eliminar', 'tipo_pago', [
                 'id' => $id,
                 'nombre' => $tipoPago['nombre'],
                 'descripcion' => $tipoPago['descripcion'] ?? ''
             ]);
 
-            header("Location: dashboard-admin.php?pagina=admin-tipo-pago&msg=eliminado");
+            header('Location: ' . $redirectUrl . '&msg=eliminado');
             exit;
-        } catch (Exception $e) {
-            // Para debugging: mostrar el error real (comentar en producción)
-            error_log("Error al eliminar tipo de pago: " . $e->getMessage());
-            header("Location: dashboard-admin.php?pagina=admin-tipo-pago&msg=error&detalle=" . urlencode($e->getMessage()));
+        } catch (Throwable $e) {
+            header('Location: ' . $redirectUrl . '&msg=error&detalle=' . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    // CRUD pagos
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion_pago']) && in_array($_POST['accion_pago'], ['crear', 'editar'], true)) {
+        try {
+            $accion = (string)$_POST['accion_pago'];
+            $pagoId = isset($_POST['pago_id']) ? (int)$_POST['pago_id'] : 0;
+
+            $estudianteId = (int)($_POST['estudiante'] ?? 0);
+            $tipoPagoId = (int)($_POST['tipo_pago'] ?? 0);
+            $montoOriginal = (float)($_POST['monto_original'] ?? 0);
+            $montoDescuento = (float)($_POST['monto_descuento'] ?? 0);
+            $comprobante = trim((string)($_POST['comprobante'] ?? ''));
+
+            if ($estudianteId <= 0 || $tipoPagoId <= 0 || $montoOriginal <= 0) {
+                throw new Exception('Complete los campos obligatorios del pago');
+            }
+
+            $montoFinal = max(0, $montoOriginal - $montoDescuento);
+
+            if ($accion === 'crear') {
+                $stmt = $pdo->prepare('INSERT INTO pagos (estudiante, tipo_pago, monto_original, monto_descuento, monto_final, fecha_pago, comprobante, registrado_por, registrado_en) VALUES (:estudiante, :tipo_pago, :monto_original, :monto_descuento, :monto_final, NOW(), :comprobante, NULL, NOW())');
+                $stmt->execute([
+                    ':estudiante' => $estudianteId,
+                    ':tipo_pago' => $tipoPagoId,
+                    ':monto_original' => $montoOriginal,
+                    ':monto_descuento' => $montoDescuento,
+                    ':monto_final' => $montoFinal,
+                    ':comprobante' => $comprobante !== '' ? $comprobante : null,
+                ]);
+
+                header('Location: ' . $redirectUrl . '&msg=pago_creado');
+                exit;
+            }
+
+            if ($pagoId <= 0) {
+                throw new Exception('Pago inválido');
+            }
+
+            $stmt = $pdo->prepare('UPDATE pagos SET estudiante = :estudiante, tipo_pago = :tipo_pago, monto_original = :monto_original, monto_descuento = :monto_descuento, monto_final = :monto_final, comprobante = :comprobante WHERE id = :id');
+            $stmt->execute([
+                ':id' => $pagoId,
+                ':estudiante' => $estudianteId,
+                ':tipo_pago' => $tipoPagoId,
+                ':monto_original' => $montoOriginal,
+                ':monto_descuento' => $montoDescuento,
+                ':monto_final' => $montoFinal,
+                ':comprobante' => $comprobante !== '' ? $comprobante : null,
+            ]);
+
+            header('Location: ' . $redirectUrl . '&msg=pago_actualizado');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: ' . $redirectUrl . '&msg=error&detalle=' . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
+    if (isset($_GET['eliminar_pago'])) {
+        try {
+            $id = filter_var($_GET['eliminar_pago'], FILTER_VALIDATE_INT);
+            if (!$id) {
+                throw new Exception('ID inválido');
+            }
+
+            $stmt = $pdo->prepare('DELETE FROM pagos WHERE id = :id');
+            $stmt->execute([':id' => $id]);
+
+            header('Location: ' . $redirectUrl . '&msg=pago_eliminado');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: ' . $redirectUrl . '&msg=error&detalle=' . urlencode($e->getMessage()));
             exit;
         }
     }
 }
 
-// Procesar acciones de admin-notificaciones ANTES de cualquier output
-if (isset($_GET['pagina']) && $_GET['pagina'] === 'admin-notificaciones') {
-    require_once __DIR__ . '/../models/NotificacionModel.php';
-    $notificacionModel = new NotificacionModel();
+// Procesar acciones de admin-usuarios-sistema ANTES de cualquier output
+if (($_GET['pagina'] ?? 'panel-admin') === 'panel-admin' && ($_GET['modulo'] ?? null) === 'admin-usuarios-sistema') {
+    require_once __DIR__ . '/../config/conexion.php';
+    $pdo = Conexion::getInstance()->getConnection();
 
-    // Marcar como leída si se solicita
-    if (isset($_GET['marcar_leida'])) {
-        $notificacionModel->marcarLeida($_GET['marcar_leida']);
-        header("Location: dashboard-admin.php?pagina=admin-notificaciones");
-        exit;
+    $redirectUrl = 'dashboard-admin.php?pagina=panel-admin&modulo=admin-usuarios-sistema';
+
+    // Remover acceso
+    if (isset($_GET['remover'])) {
+        try {
+            $usuarioId = (int)($_GET['remover'] ?? 0);
+            if ($usuarioId <= 0) {
+                throw new Exception('Solicitud inválida.');
+            }
+
+            $stmt = $pdo->prepare('DELETE FROM usuarios WHERE id = :id AND tipo IN (4,5)');
+            $stmt->execute([':id' => $usuarioId]);
+
+            header('Location: ' . $redirectUrl . '&status=access_removed');
+            exit;
+        } catch (Throwable $e) {
+            $_SESSION['usuarios_sistema_errors'] = [$e->getMessage()];
+            header('Location: ' . $redirectUrl . '&status=error');
+            exit;
+        }
     }
 
-    // Marcar todas como leídas
-    if (isset($_GET['marcar_todas'])) {
-        $notificacionModel->marcarTodasLeidas();
-        header("Location: dashboard-admin.php?pagina=admin-notificaciones");
-        exit;
+    // Asignar acceso (crear credenciales)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? null) === 'asignar_acceso') {
+        try {
+            $empleadoId = (int)($_POST['empleado_id'] ?? 0);
+            $tipo = (int)($_POST['tipo'] ?? 0);
+            $usuario = strtolower(trim((string)($_POST['usuario'] ?? '')));
+            $password = (string)($_POST['password'] ?? '');
+
+            if ($empleadoId <= 0 || !in_array($tipo, [4, 5], true) || $usuario === '' || $password === '') {
+                throw new Exception('Debe completar los campos obligatorios.');
+            }
+
+            $stmt = $pdo->prepare('SELECT id FROM empleado WHERE id = :id LIMIT 1');
+            $stmt->execute([':id' => $empleadoId]);
+            if (!$stmt->fetch()) {
+                throw new Exception('Empleado no encontrado.');
+            }
+
+            $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE estuempleado = :id AND tipo IN (4,5) LIMIT 1');
+            $stmt->execute([':id' => $empleadoId]);
+            if ($stmt->fetch()) {
+                throw new Exception('El empleado ya tiene acceso asignado.');
+            }
+
+            $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE usuario = :usuario LIMIT 1');
+            $stmt->execute([':usuario' => $usuario]);
+            if ($stmt->fetch()) {
+                throw new Exception('El usuario ya existe.');
+            }
+
+            $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare('INSERT INTO usuarios (usuario, password, tipo, estuempleado, token) VALUES (:usuario, :password, :tipo, :estuempleado, NULL)');
+            $stmt->execute([
+                ':usuario' => $usuario,
+                ':password' => $passwordHash,
+                ':tipo' => $tipo,
+                ':estuempleado' => $empleadoId,
+            ]);
+
+            header('Location: ' . $redirectUrl . '&status=access_created');
+            exit;
+        } catch (Throwable $e) {
+            $_SESSION['usuarios_sistema_errors'] = [$e->getMessage()];
+            header('Location: ' . $redirectUrl . '&status=error');
+            exit;
+        }
+    }
+
+    // Editar acceso (cambiar contraseña opcional)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? null) === 'editar_acceso') {
+        try {
+            $usuarioId = (int)($_POST['usuario_id'] ?? 0);
+            $tipo = (int)($_POST['tipo'] ?? 0);
+            $password = (string)($_POST['password'] ?? '');
+
+            if ($usuarioId <= 0 || !in_array($tipo, [4, 5], true)) {
+                throw new Exception('Solicitud inválida.');
+            }
+
+            $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE id = :id AND tipo IN (4,5) LIMIT 1');
+            $stmt->execute([':id' => $usuarioId]);
+            if (!$stmt->fetch()) {
+                throw new Exception('Usuario de sistema no encontrado.');
+            }
+
+            $sql = 'UPDATE usuarios SET tipo = :tipo';
+            $params = [':id' => $usuarioId, ':tipo' => $tipo];
+
+            if ($password !== '') {
+                $sql .= ', password = :password';
+                $params[':password'] = password_hash($password, PASSWORD_DEFAULT);
+            }
+
+            $sql .= ' WHERE id = :id';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+
+            header('Location: ' . $redirectUrl . '&status=access_updated');
+            exit;
+        } catch (Throwable $e) {
+            $_SESSION['usuarios_sistema_errors'] = [$e->getMessage()];
+            header('Location: ' . $redirectUrl . '&status=error');
+            exit;
+        }
     }
 }
 
@@ -342,35 +517,24 @@ $pagina = isset($_GET['pagina']) ? $_GET['pagina'] : 'panel-admin';
 // Normalizar nombres de páginas
 switch($pagina){
     case 'panel-admin':
-        $titulo = 'INICIO';
-        $icono = 'fa-plus';
-        $archivo = 'panel-admin';
+        $titulo = 'ADMINISTRAR USUARIOS';
+        $icono = 'fa-users-gear';
+        $archivo = 'viewsaduser';
         break;
-    case 'admin-notificaciones':
-        $titulo = 'NOTIFICACIONES';
-        $icono = 'fa-chart-bar';
-        $archivo = 'admin-notificaciones';
+    case 'admin-caja':
+        $titulo = 'ADMINISTRAR CAJA';
+        $icono = 'fa-cash-register';
+        $archivo = 'viewadcja';
         break;
-    case 'admin-agregar-usuario':
-        $titulo = 'USUARIOS';
-        $icono = 'fa-chart-bar';
-        $archivo = 'admin-agregar-usuario';
-        break;
-    case 'usuarios':
-    case 'admin-usuarios':
-        $titulo = 'USUARIOS';
-        $icono = 'fa-users';
-        $archivo = 'admin-usuarios'; // Normalizar a admin-usuarios
-        break;
-    case 'admin-tipo-pago':
-        $titulo = 'TIPO DE PAGOS';
-        $icono = 'fa-chart-bar';
-        $archivo = 'admin-tipo-pago';
+    case 'admin-sistema':
+        $titulo = 'ADMINISTRAR SISTEMA';
+        $icono = 'fa-gears';
+        $archivo = 'viewadsis';
         break;
     default:
-        $titulo = 'INICIO';
+        $titulo = 'ADMINISTRAR USUARIOS';
         $icono = 'fa-home';
-        $archivo = 'panel-admin';
+        $archivo = 'viewsaduser';
 }
 
 // Ruta del contenido
@@ -443,32 +607,26 @@ function activo($id, $pagina){
 
     <!-- MENÚ HARD-CODED CON ICONOS DE FONT AWESOME -->
     <nav class="flex flex-col gap-3 px-5">
-      <button onclick="window.location='?pagina=panel-admin'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo('registro-bienestar-estudiantil', $pagina) ?>">
+      <button onclick="window.location='?pagina=panel-admin'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo('panel-admin', $pagina) ?>">
         <span class="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-400 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-700"></span>
         <span class="absolute inset-0 bg-white/5 group-hover:bg-white/10 rounded-2xl transition-all duration-700"></span>
-        <i class="fas fa-plus text-xl relative z-10"></i>
-        <span class="relative z-10">INICIO</span>
+        <i class="fas fa-users-gear text-xl relative z-10"></i>
+        <span class="relative z-10">ADMINISTRAR USUARIOS</span>
       </button>
 
-      <button onclick="window.location='?pagina=admin-notificaciones'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo('reportes-bienestar-estudiantil', $pagina) ?>">
+      <button onclick="window.location='?pagina=admin-caja'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo('admin-caja', $pagina) ?>">
         <span class="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-400 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-700"></span>
         <span class="absolute inset-0 bg-white/5 group-hover:bg-white/10 rounded-2xl transition-all duration-700"></span>
-        <i class="fas fa-chart-bar text-xl relative z-10"></i>
-        <span class="relative z-10">NOTIFICACIONES</span>
+        <i class="fas fa-cash-register text-xl relative z-10"></i>
+        <span class="relative z-10">ADMINISTRAR CAJA</span>
       </button>
-      <button onclick="window.location='?pagina=admin-agregar-usuario'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo('reportes-bienestar-estudiantil', $pagina) ?>">
+
+      <button onclick="window.location='?pagina=admin-sistema'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo('admin-sistema', $pagina) ?>">
         <span class="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-400 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-700"></span>
         <span class="absolute inset-0 bg-white/5 group-hover:bg-white/10 rounded-2xl transition-all duration-700"></span>
-        <i class="fas fa-chart-bar text-xl relative z-10"></i>
-        <span class="relative z-10">AGREGAR USUARIO</span>
+        <i class="fas fa-gears text-xl relative z-10"></i>
+        <span class="relative z-10">ADMINISTRAR SISTEMA</span>
       </button>
-      <button onclick="window.location='?pagina=admin-tipo-pago'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo('reportes-bienestar-estudiantil', $pagina) ?>">
-        <span class="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-400 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-700"></span>
-        <span class="absolute inset-0 bg-white/5 group-hover:bg-white/10 rounded-2xl transition-all duration-700"></span>
-        <i class="fas fa-chart-bar text-xl relative z-10"></i>
-        <span class="relative z-10">AGREGAR PAGO</span>
-      </button>      
-      
     </nav>
 
     <div class="flex-1"></div>

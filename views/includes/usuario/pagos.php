@@ -71,23 +71,10 @@ if ($estudianteIdActual) {
 echo "<!-- DEBUG: ID Estudiante: " . ($estudianteIdActual ?? 'NULL') . " -->";
 echo "<!-- DEBUG: Descuentos Activos: " . print_r($descuentosActivos, true) . " -->";
 
-// Verificar y agregar campo UIT si no existe
-try {
-    $stmt = $pdo->query("SHOW COLUMNS FROM tipo_pago LIKE 'uit'");
-    $hasUIT = $stmt->rowCount() > 0;
-    
-    if (!$hasUIT) {
-        // Agregar campo UIT a la tabla
-        $pdo->exec("ALTER TABLE tipo_pago ADD COLUMN uit DECIMAL(10,2) DEFAULT 0.00 AFTER descripcion");
-    }
-} catch (Exception $e) {
-    error_log("Error verificando campo UIT: " . $e->getMessage());
-}
-
-// Obtener TODOS los datos con UIT - mostrar todos los conceptos de pago ordenados por ID
+// Obtener TODOS los conceptos de pago con precio
 try {
     $stmt = $pdo->query("
-        SELECT id, nombre, descripcion, COALESCE(uit, 0.00) as uit 
+        SELECT id, nombre, descripcion, COALESCE(precio, 0.00) as precio
         FROM tipo_pago 
         ORDER BY id ASC
     ");
@@ -96,7 +83,7 @@ try {
     // Fallback si hay error
     try {
         $stmt = $pdo->query("
-            SELECT id, nombre, descripcion, COALESCE(uit, 0.00) as uit 
+            SELECT id, nombre, descripcion, COALESCE(precio, 0.00) as precio
             FROM tipo_pago 
             ORDER BY id ASC
         ");
@@ -106,7 +93,7 @@ try {
         $stmt = $pdo->query("SELECT id, nombre, descripcion FROM tipo_pago ORDER BY id ASC");
         $lista = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($lista as &$item) {
-            $item['uit'] = 0.00;
+            $item['precio'] = 0.00;
         }
     }
 }
@@ -131,7 +118,7 @@ try {
           <tr class="bg-gray-200">
             <th class="py-3 px-4 border border-gray-300 text-left font-semibold text-gray-700">ID</th>
             <th class="py-3 px-4 border border-gray-300 text-left font-semibold text-gray-700">DESCRIPCIÓN</th>
-            <th class="py-3 px-4 border border-gray-300 text-left font-semibold text-gray-700">UIT</th>
+            <th class="py-3 px-4 border border-gray-300 text-left font-semibold text-gray-700">PRECIO</th>
             <th class="py-3 px-4 border border-gray-300 text-center font-semibold text-gray-700">ACCIONES</th>
           </tr>
         </thead>
@@ -139,15 +126,15 @@ try {
           <?php foreach ($lista as $index => $item): 
             $id = (int)$item['id'];
             $descripcion = htmlspecialchars($item['descripcion'], ENT_QUOTES, 'UTF-8');
-            $uit = isset($item['uit']) && $item['uit'] > 0 ? number_format((float)$item['uit'], 2, '.', '') : number_format(0.00, 2, '.', '');
+            $precio = isset($item['precio']) && $item['precio'] > 0 ? number_format((float)$item['precio'], 2, '.', '') : number_format(0.00, 2, '.', '');
           ?>
             <tr class="hover:bg-gray-50 border-b border-gray-200">
               <td class="py-3 px-4 border border-gray-300 text-gray-700"><?= $id ?></td>
               <td class="py-3 px-4 border border-gray-300 text-gray-700"><?= $descripcion ?></td>
-              <td class="py-3 px-4 border border-gray-300 text-gray-700">S/ <?= $uit ?></td>
+              <td class="py-3 px-4 border border-gray-300 text-gray-700">S/ <?= $precio ?></td>
               <td class="py-3 px-4 border border-gray-300 text-center">
                 <button 
-                  onclick="abrirModalPago('<?= $id ?>', '<?= $descripcion ?>', <?= $uit ?>, <?= $id ?>)"
+                  onclick="abrirModalPago('<?= $id ?>', '<?= $descripcion ?>', <?= $precio ?>, <?= $id ?>)"
                   class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium">
                   <i class="fas fa-credit-card mr-2"></i> Pagar
                 </button>
@@ -173,7 +160,7 @@ try {
 
           <div class="bg-gray-50 border rounded-2xl p-6 shadow-sm space-y-3">
             <p class="flex justify-between text-gray-700"><span>Concepto</span><span id="modal-concept-name" class="font-medium">—</span></p>
-            <p class="flex justify-between text-gray-700"><span>UIT</span><span id="modal-uit-value" class="font-medium">S/ 0.00</span></p>
+            <p class="flex justify-between text-gray-700"><span>Precio</span><span id="modal-precio-value" class="font-medium">S/ 0.00</span></p>
             
             <!-- Sección de Descuentos -->
             <div id="modal-descuentos-section" class="hidden">
@@ -374,7 +361,7 @@ try {
   </style>
 
   <script>
-    let pagoActual = { numero: '', concepto: '', uit: 0, id: 0 };
+    let pagoActual = { numero: '', concepto: '', precio: 0, id: 0 };
 
     // Filtro de búsqueda
     document.addEventListener('DOMContentLoaded', function() {
@@ -402,11 +389,11 @@ try {
       }
     });
 
-    function abrirModalPago(numero, concepto, uit, id) {
-      pagoActual = { numero, concepto, uit: parseFloat(uit), id: parseInt(id) };
+    function abrirModalPago(numero, concepto, precio, id) {
+      pagoActual = { numero, concepto, precio: parseFloat(precio), id: parseInt(id) };
       
-      // El monto total es directamente el valor UIT (sin multiplicar)
-      const montoTotal = pagoActual.uit;
+      // El monto total es el precio
+      const montoTotal = pagoActual.precio;
       
       // Calcular descuentos
       const descuentos = <?php echo json_encode($descuentosActivos); ?>;
@@ -452,7 +439,7 @@ try {
       
       // Actualizar datos del modal
       document.getElementById('modal-concept-name').textContent = concepto;
-      document.getElementById('modal-uit-value').textContent = 'S/ ' + montoTotal.toFixed(2);
+      document.getElementById('modal-precio-value').textContent = 'S/ ' + montoTotal.toFixed(2);
       document.getElementById('modal-discount-value').textContent = 'S/ ' + montoDescuento.toFixed(2);
       document.getElementById('modal-total-amount').textContent = 'S/ ' + montoFinal.toFixed(2);
       document.getElementById('modal-pay-amount').textContent = 'S/ ' + montoFinal.toFixed(2);
@@ -547,8 +534,8 @@ try {
             return;
           }
 
-          // El monto es directamente el valor UIT
-          const monto = pagoActual.uit;
+          // El monto es el precio
+          const monto = pagoActual.precio;
           
           // Calcular descuento
           const descuentos = <?php echo json_encode($descuentosActivos); ?>;
@@ -589,7 +576,7 @@ try {
                 metodo_pago: metodoPago.value,
                 tipo_pago_id: pagoActual.id,
                 numero: pagoActual.numero,
-                uit: pagoActual.uit,
+                precio: pagoActual.precio,
                 dni_estudiante: dniEstudiante,
                 nombre_estudiante: nombreEstudiante
               })

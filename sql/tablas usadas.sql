@@ -93,7 +93,7 @@ create database db_sistema;
 		id int primary key not null auto_increment,
 		usuario varchar(200),
 		password text,
-		tipo int, -- 1 ES EMPLEADO, 2 ES ESTUDIANTE, 3 ES EMPRESA  
+		tipo int, -- 1 ES EMPLEADO, 2 ES ESTUDIANTE, 3 ES EMPRESA, 4 ES BIENESTAR, 5 ES DIRECION
 		estuempleado int,
 		token text
 	);
@@ -173,7 +173,8 @@ create table historial_descuentos(
 create table tipo_pago(
 	id int primary key not null auto_increment,
 	nombre varchar(50) not null unique,
-	descripcion varchar(150)
+	descripcion varchar(150),
+	precio decimal(10,2) not null
 );
 
 create table pagos(

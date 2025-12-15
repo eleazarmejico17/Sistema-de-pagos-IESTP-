@@ -32,8 +32,7 @@
 
           <div class="bg-gray-50 border rounded-2xl p-6 shadow-sm space-y-3">
               <p class="flex justify-between text-gray-700"><span>Concepto</span><span id="concept-name" class="font-medium">—</span></p>
-              <p class="flex justify-between text-gray-700"><span>UIT</span><span id="uit-value" class="font-medium">0.00</span></p>
-              <p class="flex justify-between text-gray-700"><span>Valor UIT Unitario</span><span id="uit-unit-value" class="font-medium">S/ 5,150.00</span></p>
+              <p class="flex justify-between text-gray-700"><span>Precio</span><span id="precio-value" class="font-medium">0.00</span></p>
               <p class="flex justify-between text-gray-700"><span>Descuento</span><span id="discount-value" class="font-medium">S/ 0.00</span></p>
               <p class="flex justify-between font-semibold text-gray-800 text-lg border-t pt-3"><span>Total a Pagar</span><span id="total-amount">S/ 0.00</span></p>
             </div>
@@ -207,31 +206,21 @@
 </body>
 <script>
   (function(){
-    // Valor UIT en soles (debe coincidir con el valor en pagos.php)
-    const VALOR_UIT_SOLES = 5150.00;
-    
     const params = new URLSearchParams(window.location.search);
     const concept = params.get('concept') || params.get('nombre') || '';
     const descripcion = params.get('descripcion') || '';
-    const uit = parseFloat(params.get('uit')) || 0;
+    const precio = parseFloat(params.get('precio')) || 0;
     
-    // SIEMPRE calcular el monto desde el UIT: UIT * VALOR_UIT_SOLES
-    // Ignorar el parámetro amount y calcular siempre desde el UIT para asegurar consistencia
-    const amount = (uit * VALOR_UIT_SOLES).toFixed(2);
+    // El monto total es directamente el precio
+    const amount = precio.toFixed(2);
 
     const elConcept = document.getElementById('concept-name');
-    const elUit = document.getElementById('uit-value');
-    const elUitUnit = document.getElementById('uit-unit-value');
+    const elPrecio = document.getElementById('precio-value');
     const elTotal = document.getElementById('total-amount');
     const elPayAmount = document.getElementById('pay-amount');
 
     if(elConcept) elConcept.textContent = descripcion || concept || '—';
-    if(elUit) elUit.textContent = uit.toFixed(2) || '0.00';
-    if(elUitUnit) {
-      // Formatear el valor unitario de la UIT con separador de miles
-      const uitUnitFormatted = VALOR_UIT_SOLES.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      elUitUnit.textContent = 'S/ ' + uitUnitFormatted;
-    }
+    if(elPrecio) elPrecio.textContent = precio.toFixed(2) || '0.00';
 
     // Formatea y muestra el monto total calculado
     const montoTotal = parseFloat(amount);
@@ -292,9 +281,8 @@
         ocultarMensaje();
 
         const metodoPago = document.querySelector('input[name="metodo_pago"]:checked');
-        // Calcular el monto siempre desde el UIT (fuente de verdad)
-        const uitValue = parseFloat(params.get('uit')) || 0;
-        const monto = (uitValue * VALOR_UIT_SOLES);
+        // El monto es el precio
+        const monto = parseFloat(params.get('precio')) || 0;
 
         // Validaciones
         if (!metodoPago) {
@@ -325,7 +313,7 @@
           const conceptoPago = urlParams.get('descripcion') || urlParams.get('concept') || urlParams.get('nombre') || concept || 'Pago de servicio';
           const tipoPagoId = urlParams.get('id') || '';
           const numero = urlParams.get('concept') || '';
-          const uit = urlParams.get('uit') || '';
+          const precio = urlParams.get('precio') || '';
           
           const response = await fetch(baseUrl + '/controller/procesarPago.php', {
             method: 'POST',
@@ -338,7 +326,7 @@
               metodo_pago: metodoPago.value,
               tipo_pago_id: tipoPagoId,
               numero: numero,
-              uit: uit
+              precio: precio
             })
           });
 

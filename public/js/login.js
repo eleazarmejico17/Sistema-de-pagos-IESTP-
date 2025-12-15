@@ -56,7 +56,7 @@
       errorContainer.style.transform = "translateY(0)";
     });
     
-    // Ocultar después de 5 segundos
+    // Ocultar después de 12 segundos
     errorContainer.timeoutId = setTimeout(() => {
       errorContainer.style.opacity = "0";
       errorContainer.style.transform = "translateY(-10px)";
@@ -67,7 +67,7 @@
         errorContainer.setAttribute("hidden", "true");
         errorText.textContent = "";
       }, 300);
-    }, 5000);
+    }, 12000);
   }
 
   function ocultarError() {
@@ -219,17 +219,97 @@
     return typeof txt === "string" ? txt.trim().toLowerCase() : "";
   }
 
+  function rawValue(txt) {
+    return typeof txt === "string" ? txt : "";
+  }
+
+  function setTipoAccesoUI(tipo) {
+    const hidden = document.getElementById("tipo_acceso");
+    if (hidden) hidden.value = tipo;
+
+    const btns = document.querySelectorAll(".tipo-acceso-btn");
+    btns.forEach((b) => {
+      const isActive = b.dataset?.acceso === tipo;
+
+      // Reset hover classes (evita que el activo se vuelva gris al pasar el mouse)
+      b.classList.remove("hover:bg-gray-100", "hover:border-gray-400", "hover:bg-blue-700", "hover:border-blue-700");
+
+      b.classList.toggle("bg-blue-600", isActive);
+      b.classList.toggle("text-white", isActive);
+      b.classList.toggle("border-blue-600", isActive);
+      b.classList.toggle("bg-white", !isActive);
+      b.classList.toggle("text-gray-700", !isActive);
+      b.classList.toggle("border-gray-300", !isActive);
+
+      if (isActive) {
+        b.classList.add("hover:bg-blue-700", "hover:border-blue-700");
+      } else {
+        b.classList.add("hover:bg-gray-100", "hover:border-gray-400");
+      }
+    });
+
+    const usuarioInput = document.getElementById("usuario");
+    const usuarioLabel = document.getElementById("usuarioLabel");
+    const usuarioHint = document.getElementById("usuarioHint");
+    const btnRegistro = document.getElementById("btnRegistro");
+    const registroDivider = document.getElementById("registroDivider");
+
+    if (tipo === "admin") {
+      if (usuarioLabel) usuarioLabel.textContent = "Usuario administrador";
+      if (usuarioInput) usuarioInput.placeholder = "admin@institutocajas.edu.pe";
+      if (usuarioHint) usuarioHint.textContent = "Ingrese el usuario y contraseña definidos en login.php.";
+      if (btnRegistro) btnRegistro.style.display = "none";
+      if (registroDivider) registroDivider.style.display = "none";
+    } else if (tipo === "bienestar") {
+      if (usuarioLabel) usuarioLabel.textContent = "Correo de Bienestar";
+      if (usuarioInput) usuarioInput.placeholder = "bienestar@institutocajas.edu.pe";
+      if (usuarioHint) usuarioHint.textContent = "Ingrese el correo asignado por el administrador.";
+      if (btnRegistro) btnRegistro.style.display = "none";
+      if (registroDivider) registroDivider.style.display = "none";
+    } else if (tipo === "direccion") {
+      if (usuarioLabel) usuarioLabel.textContent = "Correo de Dirección";
+      if (usuarioInput) usuarioInput.placeholder = "direccion@institutocajas.edu.pe";
+      if (usuarioHint) usuarioHint.textContent = "Ingrese el correo asignado por el administrador.";
+      if (btnRegistro) btnRegistro.style.display = "none";
+      if (registroDivider) registroDivider.style.display = "none";
+    } else {
+      if (usuarioLabel) usuarioLabel.textContent = "Correo Institucional";
+      if (usuarioInput) usuarioInput.placeholder = "12345678@institutocajas.edu.pe";
+      if (usuarioHint) usuarioHint.textContent = "Use su correo institucional asignado";
+      if (btnRegistro) btnRegistro.style.display = "block";
+      if (registroDivider) registroDivider.style.display = "block";
+    }
+  }
+
   /* ----------  INIT  ---------- */
-  document.addEventListener("DOMContentLoaded", () => {
+  function initLogin() {
     const form = document.getElementById("loginForm");
     if (!form) return;
+
+    // Inicializar selector de tipo
+    const hiddenTipo = document.getElementById("tipo_acceso");
+    const initialTipo = (hiddenTipo && hiddenTipo.value) ? hiddenTipo.value : "estudiante";
+    setTipoAccesoUI(initialTipo);
+
+    const tipoButtons = document.querySelectorAll(".tipo-acceso-btn");
+    tipoButtons.forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const ds = btn.dataset;
+        const tipo = (ds && ds.acceso) ? ds.acceso : "estudiante";
+        setTipoAccesoUI(tipo);
+        ocultarError();
+      });
+    });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       try {
         const usuario  = normalizar(document.getElementById("usuario")?.value);
-        const password = normalizar(document.getElementById("password")?.value);
+        const password = rawValue(document.getElementById("password")?.value);
+        const tipoField = document.getElementById("tipo_acceso");
+        const tipo_acceso = ((tipoField && tipoField.value) ? tipoField.value : "estudiante").trim();
 
         // Ocultar error anterior
         ocultarError();
@@ -245,6 +325,15 @@
           return;
         }
 
+        // Validación específica: estudiantes deben usar formato 8 dígitos + @institutocajas.edu.pe
+        if (tipo_acceso === "estudiante") {
+          const reEst = /^(\d{8})@institutocajas\.edu\.pe$/;
+          if (!reEst.test(usuario)) {
+            mostrarError("Para estudiantes el correo debe ser: DNI@institutocajas.edu.pe");
+            return;
+          }
+        }
+
         // Deshabilitar el botón mientras se procesa
         const loginBtn = document.getElementById("loginBtn");
         const originalBtnText = loginBtn.innerHTML;
@@ -254,7 +343,7 @@
         const res = await fetch("login.php", {
           method : "POST",
           headers: { "Content-Type": "application/json" },
-          body   : JSON.stringify({ usuario, password })
+          body   : JSON.stringify({ usuario, password, tipo_acceso })
         });
 
         let data;
@@ -309,5 +398,14 @@
         }
       }
     });
-  });
+
+    // Evita doble inicialización
+    form.dataset.loginInit = "1";
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initLogin);
+  } else {
+    initLogin();
+  }
 })();

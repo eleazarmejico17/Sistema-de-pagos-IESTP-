@@ -8,7 +8,7 @@ class AuthController {
         session_destroy();
 
         // Redirige al login en public
-        header("Location: /Sistema-de-pagos-IESTP/index.html");
+        header("Location: /Sistema-de-pagos-IESTP/index.php");
         exit();
     }
 }

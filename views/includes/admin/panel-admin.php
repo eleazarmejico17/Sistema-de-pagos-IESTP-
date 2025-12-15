@@ -24,7 +24,7 @@ function activopanel($id, $pagina)
 }
 
 $modulo = $_GET['modulo'] ?? null;
-$archivos_validos = ['admin-usuarios', 'admin-bienestar', 'admin-direccion'];
+$archivos_validos = ['admin-usuarios', 'admin-bienestar', 'admin-direccion', 'admin-usuarios-sistema'];
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -61,7 +61,17 @@ $archivos_validos = ['admin-usuarios', 'admin-bienestar', 'admin-direccion'];
       <button type="submit" class="card-animate hover-lift bg-gradient-to-br from-lime-400 to-emerald-500 text-white p-6 rounded-2xl shadow-lg w-full text-left">
         <i class="fas fa-heart text-3xl mb-2"></i>
         <h3 class="text-xl font-bold">EMPLEADOS</h3>
-        <p class="text-sm opacity-90">Gestión de Empleados</p>
+        <p class="text-sm opacity-90">Asignar credenciales</p>
+      </button>
+    </form>
+
+
+    <form method="GET">
+      <input type="hidden" name="modulo" value="admin-usuarios-sistema">
+      <button type="submit" class="card-animate hover-lift bg-gradient-to-br from-slate-700 to-slate-900 text-white p-6 rounded-2xl shadow-lg w-full text-left">
+        <i class="fas fa-user-shield text-3xl mb-2"></i>
+        <h3 class="text-xl font-bold">USUARIOS DEL SISTEMA</h3>
+        <p class="text-sm opacity-90">Gestión de credenciales y acceso</p>
       </button>
     </form>
 

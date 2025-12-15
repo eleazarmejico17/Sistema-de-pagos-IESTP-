@@ -23,7 +23,7 @@ try {
     $metodo_pago = $data['metodo_pago'] ?? '';
     $tipoPagoId = $data['tipo_pago_id'] ?? 1;
     $numero = $data['numero'] ?? '';
-    $uit = $data['uit'] ?? 0;
+    $precio = $data['precio'] ?? 0;
     $dniEstudiante = $data['dni_estudiante'] ?? '';
     $nombreEstudiante = $data['nombre_estudiante'] ?? '';
 
@@ -39,6 +39,8 @@ try {
     if ($monto <= 0) {
         throw new Exception("El monto debe ser mayor a cero");
     }
+
+    // $precio se recibe por compatibilidad/registro, pero el monto final se calcula desde $monto
 
     // Obtener conexión
     $db = Conexion::getInstance()->getConnection();

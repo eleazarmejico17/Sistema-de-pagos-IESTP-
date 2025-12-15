@@ -182,7 +182,7 @@ class BeneficiarioModel {
     }
 
     /**
-     * Obtiene la lista de conceptos de pago con valores UIT
+     * Obtiene la lista de conceptos de pago con precio
      * @return array Lista de conceptos de pago
      */
     public function listarConceptosPago() {
@@ -192,21 +192,21 @@ class BeneficiarioModel {
             $existeTabla = $stmt->rowCount() > 0;
             
             if ($existeTabla) {
-                // Verificar si existe la columna uit
-                $stmt = $this->db->query("SHOW COLUMNS FROM tipo_pago LIKE 'uit'");
-                $tieneUIT = $stmt->rowCount() > 0;
+                // Verificar si existe la columna precio
+                $stmt = $this->db->query("SHOW COLUMNS FROM tipo_pago LIKE 'precio'");
+                $tienePrecio = $stmt->rowCount() > 0;
                 
-                if ($tieneUIT) {
+                if ($tienePrecio) {
                     $sql = $this->db->prepare("
                         SELECT 
                             id,
                             nombre,
                             descripcion,
-                            COALESCE(uit, 0.00) AS uit,
+                            COALESCE(precio, 0.00) AS precio,
                             CASE 
-                                WHEN uit > 0 THEN 'Activo'
+                                WHEN precio > 0 THEN 'Activo'
                                 ELSE 'Sin valor'
-                            END AS estado_uit
+                            END AS estado_precio
                         FROM tipo_pago 
                         ORDER BY nombre ASC
                     ");
@@ -216,8 +216,8 @@ class BeneficiarioModel {
                             id,
                             nombre,
                             descripcion,
-                            0.00 AS uit,
-                            'Sin configurar' AS estado_uit
+                            0.00 AS precio,
+                            'Sin configurar' AS estado_precio
                         FROM tipo_pago 
                         ORDER BY nombre ASC
                     ");
@@ -234,28 +234,28 @@ class BeneficiarioModel {
             
             // Si no hay tabla o no hay resultados, devolver datos de ejemplo
             return [
-                ['id' => 1, 'nombre' => '1.1', 'descripcion' => 'Carnet de Medio Pasaje', 'uit' => 18.00, 'estado_uit' => 'Activo'],
-                ['id' => 2, 'nombre' => '1.2', 'descripcion' => 'Duplicado de carnet', 'uit' => 18.00, 'estado_uit' => 'Activo'],
-                ['id' => 3, 'nombre' => '3.1', 'descripcion' => 'Inscripción del postulante modalidad ordinario', 'uit' => 205.00, 'estado_uit' => 'Activo'],
-                ['id' => 4, 'nombre' => '3.2', 'descripcion' => 'Inscripción del postulante modalidad exonerados', 'uit' => 205.00, 'estado_uit' => 'Activo'],
-                ['id' => 5, 'nombre' => '5.1', 'descripcion' => 'Ratificación de matrícula', 'uit' => 172.00, 'estado_uit' => 'Activo'],
-                ['id' => 6, 'nombre' => '5.2', 'descripcion' => 'Matrícula Ingresantes', 'uit' => 220.00, 'estado_uit' => 'Activo'],
-                ['id' => 7, 'nombre' => '6.1', 'descripcion' => 'Trámite de matrícula extemporánea', 'uit' => 8.00, 'estado_uit' => 'Activo'],
-                ['id' => 8, 'nombre' => '7.1', 'descripcion' => 'Convalidación interna por semestre', 'uit' => 61.00, 'estado_uit' => 'Activo']
+                ['id' => 1, 'nombre' => '1.1', 'descripcion' => 'Carnet de Medio Pasaje', 'precio' => 18.00, 'estado_precio' => 'Activo'],
+                ['id' => 2, 'nombre' => '1.2', 'descripcion' => 'Duplicado de carnet', 'precio' => 18.00, 'estado_precio' => 'Activo'],
+                ['id' => 3, 'nombre' => '3.1', 'descripcion' => 'Inscripción del postulante modalidad ordinario', 'precio' => 205.00, 'estado_precio' => 'Activo'],
+                ['id' => 4, 'nombre' => '3.2', 'descripcion' => 'Inscripción del postulante modalidad exonerados', 'precio' => 205.00, 'estado_precio' => 'Activo'],
+                ['id' => 5, 'nombre' => '5.1', 'descripcion' => 'Ratificación de matrícula', 'precio' => 172.00, 'estado_precio' => 'Activo'],
+                ['id' => 6, 'nombre' => '5.2', 'descripcion' => 'Matrícula Ingresantes', 'precio' => 220.00, 'estado_precio' => 'Activo'],
+                ['id' => 7, 'nombre' => '6.1', 'descripcion' => 'Trámite de matrícula extemporánea', 'precio' => 8.00, 'estado_precio' => 'Activo'],
+                ['id' => 8, 'nombre' => '7.1', 'descripcion' => 'Convalidación interna por semestre', 'precio' => 61.00, 'estado_precio' => 'Activo']
             ];
             
         } catch (PDOException $e) {
             error_log("Error en listarConceptosPago: " . $e->getMessage());
             // En caso de error, devolver datos de ejemplo
             return [
-                ['id' => 1, 'nombre' => '1.1', 'descripcion' => 'Carnet de Medio Pasaje', 'uit' => 18.00, 'estado_uit' => 'Activo'],
-                ['id' => 2, 'nombre' => '1.2', 'descripcion' => 'Duplicado de carnet', 'uit' => 18.00, 'estado_uit' => 'Activo'],
-                ['id' => 3, 'nombre' => '3.1', 'descripcion' => 'Inscripción del postulante modalidad ordinario', 'uit' => 205.00, 'estado_uit' => 'Activo'],
-                ['id' => 4, 'nombre' => '3.2', 'descripcion' => 'Inscripción del postulante modalidad exonerados', 'uit' => 205.00, 'estado_uit' => 'Activo'],
-                ['id' => 5, 'nombre' => '5.1', 'descripcion' => 'Ratificación de matrícula', 'uit' => 172.00, 'estado_uit' => 'Activo'],
-                ['id' => 6, 'nombre' => '5.2', 'descripcion' => 'Matrícula Ingresantes', 'uit' => 220.00, 'estado_uit' => 'Activo'],
-                ['id' => 7, 'nombre' => '6.1', 'descripcion' => 'Trámite de matrícula extemporánea', 'uit' => 8.00, 'estado_uit' => 'Activo'],
-                ['id' => 8, 'nombre' => '7.1', 'descripcion' => 'Convalidación interna por semestre', 'uit' => 61.00, 'estado_uit' => 'Activo']
+                ['id' => 1, 'nombre' => '1.1', 'descripcion' => 'Carnet de Medio Pasaje', 'precio' => 18.00, 'estado_precio' => 'Activo'],
+                ['id' => 2, 'nombre' => '1.2', 'descripcion' => 'Duplicado de carnet', 'precio' => 18.00, 'estado_precio' => 'Activo'],
+                ['id' => 3, 'nombre' => '3.1', 'descripcion' => 'Inscripción del postulante modalidad ordinario', 'precio' => 205.00, 'estado_precio' => 'Activo'],
+                ['id' => 4, 'nombre' => '3.2', 'descripcion' => 'Inscripción del postulante modalidad exonerados', 'precio' => 205.00, 'estado_precio' => 'Activo'],
+                ['id' => 5, 'nombre' => '5.1', 'descripcion' => 'Ratificación de matrícula', 'precio' => 172.00, 'estado_precio' => 'Activo'],
+                ['id' => 6, 'nombre' => '5.2', 'descripcion' => 'Matrícula Ingresantes', 'precio' => 220.00, 'estado_precio' => 'Activo'],
+                ['id' => 7, 'nombre' => '6.1', 'descripcion' => 'Trámite de matrícula extemporánea', 'precio' => 8.00, 'estado_precio' => 'Activo'],
+                ['id' => 8, 'nombre' => '7.1', 'descripcion' => 'Convalidación interna por semestre', 'precio' => 61.00, 'estado_precio' => 'Activo']
             ];
         }
     }

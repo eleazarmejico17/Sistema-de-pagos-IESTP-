@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registro - Sistema de Pagos</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    }
+
+    .input-field {
+      transition: all 0.3s ease;
+      border: 2px solid #e2e8f0;
+    }
+
+    .input-field:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .section-header {
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      border-left: 4px solid #3b82f6;
+    }
+
+    .progress-step {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+    }
+
+    .progress-step.active {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .progress-line {
+      flex: 1;
+      height: 2px;
+      background: #e2e8f0;
+    }
+
+    .progress-line.active {
+      background: #3b82f6;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100">
+  <!-- Header -->
+  <header class="bg-white shadow-sm">
+    <div class="container mx-auto px-4 py-4">
+      <div class="flex items-center justify-between">
+        <a href="login.html" class="flex items-center space-x-3 text-blue-700 hover:text-blue-900">
+          <i class="fas fa-arrow-left"></i>
+          <span class="font-medium">Volver al Login</span>
+        </a>
+        <div class="text-center">
+          <h1 class="text-xl font-bold text-gray-800">Instituto Superior Tecnológico Cajas</h1>
+          <p class="text-sm text-gray-600">Registro de Estudiantes</p>
+        </div>
+        <img src="img/logo1.png" alt="Logo" class="h-10 w-10">
+      </div>
+    </div>
+  </header>
+
+  <!-- Barra de progreso -->
+  <div class="container mx-auto px-4 mt-6">
+    <div class="flex items-center justify-center max-w-2xl mx-auto">
+      <div class="flex items-center">
+        <div class="progress-step active">
+          <i class="fas fa-user"></i>
+        </div>
+        <div class="progress-line active mx-4"></div>
+        <div class="progress-step">
+          <i class="fas fa-lock"></i>
+        </div>
+        <div class="progress-line mx-4"></div>
+        <div class="progress-step">
+          <i class="fas fa-check"></i>
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-between max-w-2xl mx-auto mt-2 text-sm">
+      <span class="text-blue-600 font-medium">Datos Personales</span>
+      <span class="text-gray-500">Credenciales</span>
+      <span class="text-gray-500">Confirmación</span>
+    </div>
+  </div>
+
+  <main class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+      <!-- Tarjeta de Registro -->
+      <div class="glass-card rounded-xl shadow-xl overflow-hidden">
+        <!-- Encabezado -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-2xl font-bold text-white">Registro de Nuevo Estudiante</h2>
+              <p class="text-blue-100 mt-1">Complete sus datos para acceder al sistema de pagos</p>
+              <p class="text-blue-100 mt-2 text-sm font-semibold">Este registro es solo para estudiantes.</p>
+            </div>
+            <div class="bg-white/20 p-3 rounded-full">
+              <i class="fas fa-user-plus text-white text-2xl"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formulario -->
+        <form id="registerForm" class="p-8">
+          <!-- Información de cuenta -->
+          <div class="mb-10">
+            <div class="section-header px-4 py-3 rounded-t-lg mb-6">
+              <h3 class="font-bold text-gray-800 flex items-center">
+                <i class="fas fa-id-card mr-3 text-blue-600"></i>
+                Información de Cuenta
+              </h3>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label for="correo_institucional" class="block text-sm font-medium text-gray-700 mb-2">
+                  Correo Institucional *
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-university text-gray-400"></i>
+                  </div>
+                  <input
+                    type="email"
+                    id="correo_institucional"
+                    name="correo_institucional"
+                    placeholder="12345678@institutocajas.edu.pe"
+                    required
+                    class="input-field w-full pl-10 pr-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                  />
+                </div>
+                <p class="mt-1 text-xs text-gray-500">Formato: DNI + @institutocajas.edu.pe</p>
+              </div>
+
+              <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+                  Contraseña *
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-lock text-gray-400"></i>
+                  </div>
+                  <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="••••••••"
+                    required
+                    class="input-field w-full pl-10 pr-10 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                  />
+                  <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center" onclick="togglePassword()">
+                    <i class="fas fa-eye text-gray-400"></i>
+                  </button>
+                </div>
+                <div class="mt-2 space-y-1">
+                  <div class="flex items-center text-xs">
+                    <i class="fas fa-check text-green-500 mr-2"></i>
+                    <span class="text-gray-600">Mínimo 8 caracteres</span>
+                  </div>
+                  <div class="flex items-center text-xs">
+                    <i class="fas fa-check text-green-500 mr-2"></i>
+                    <span class="text-gray-600">Incluir números y letras</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label for="codigo_verificacion" class="block text-sm font-medium text-gray-700 mb-2">
+                  Código de Verificación
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-key text-gray-400"></i>
+                  </div>
+                  <input
+                    type="text"
+                    id="codigo_verificacion"
+                    name="codigo_verificacion"
+                    placeholder="Opcional"
+                    class="input-field w-full pl-10 pr-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Datos personales -->
+          <div class="mb-10">
+            <div class="section-header px-4 py-3 rounded-t-lg mb-6">
+              <h3 class="font-bold text-gray-800 flex items-center">
+                <i class="fas fa-user-circle mr-3 text-blue-600"></i>
+                Datos Personales
+              </h3>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- DNI -->
+              <div>
+                <label for="dni_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  DNI *
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-id-card text-gray-400"></i>
+                  </div>
+                  <input
+                    type="text"
+                    id="dni_est"
+                    name="dni_est"
+                    maxlength="8"
+                    placeholder="12345678"
+                    required
+                    class="input-field w-full pl-10 pr-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <!-- Sexo -->
+              <div>
+                <label for="sex_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  Sexo *
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-venus-mars text-gray-400"></i>
+                  </div>
+                  <select
+                    id="sex_est"
+                    name="sex_est"
+                    required
+                    class="input-field w-full pl-10 pr-4 py-3 rounded-lg bg-gray-50 focus:bg-white appearance-none"
+                  >
+                    <option value="" class="text-gray-500">Seleccione...</option>
+                    <option value="M" class="text-gray-800">Masculino</option>
+                    <option value="F" class="text-gray-800">Femenino</option>
+                  </select>
+                  <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <i class="fas fa-chevron-down text-gray-400"></i>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Apellidos y Nombres -->
+              <div>
+                <label for="ap_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  Apellido Paterno *
+                </label>
+                <input
+                  type="text"
+                  id="ap_est"
+                  name="ap_est"
+                  placeholder="Pérez"
+                  required
+                  class="input-field w-full px-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label for="am_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  Apellido Materno *
+                </label>
+                <input
+                  type="text"
+                  id="am_est"
+                  name="am_est"
+                  placeholder="Gómez"
+                  required
+                  class="input-field w-full px-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label for="nom_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  Nombres *
+                </label>
+                <input
+                  type="text"
+                  id="nom_est"
+                  name="nom_est"
+                  placeholder="Juan Carlos"
+                  required
+                  class="input-field w-full px-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                />
+              </div>
+
+              <!-- Fecha Nacimiento -->
+              <div>
+                <label for="fecnac_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  Fecha de Nacimiento
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-calendar text-gray-400"></i>
+                  </div>
+                  <input
+                    type="date"
+                    id="fecnac_est"
+                    name="fecnac_est"
+                    class="input-field w-full pl-10 pr-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <!-- Contacto -->
+              <div>
+                <label for="cel_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  Celular
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-phone text-gray-400"></i>
+                  </div>
+                  <input
+                    type="text"
+                    id="cel_est"
+                    name="cel_est"
+                    maxlength="9"
+                    placeholder="999888777"
+                    class="input-field w-full pl-10 pr-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label for="mailp_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  Correo Personal
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-envelope text-gray-400"></i>
+                  </div>
+                  <input
+                    type="email"
+                    id="mailp_est"
+                    name="mailp_est"
+                    placeholder="tucorreo@gmail.com"
+                    class="input-field w-full pl-10 pr-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <!-- Dirección -->
+              <div class="md:col-span-2">
+                <label for="dir_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  Dirección
+                </label>
+                <div class="relative">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-map-marker-alt text-gray-400"></i>
+                  </div>
+                  <input
+                    type="text"
+                    id="dir_est"
+                    name="dir_est"
+                    placeholder="Av. Principal 123"
+                    class="input-field w-full pl-10 pr-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <!-- Ubigeo -->
+              <div>
+                <label for="ubigeodir_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  Código Ubigeo Dirección
+                </label>
+                <input
+                  type="text"
+                  id="ubigeodir_est"
+                  name="ubigeodir_est"
+                  maxlength="6"
+                  placeholder="000000"
+                  class="input-field w-full px-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label for="ubigeonac_est" class="block text-sm font-medium text-gray-700 mb-2">
+                  Código Ubigeo Nacimiento
+                </label>
+                <input
+                  type="text"
+                  id="ubigeonac_est"
+                  name="ubigeonac_est"
+                  maxlength="6"
+                  placeholder="000000"
+                  class="input-field w-full px-4 py-3 rounded-lg bg-gray-50 focus:bg-white"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Términos y condiciones -->
+          <div class="mb-8">
+            <div class="flex items-start">
+              <input
+                type="checkbox"
+                id="terms"
+                required
+                class="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1"
+              />
+              <label for="terms" class="ml-3 block text-sm text-gray-700">
+                Acepto los 
+                <a href="#" class="text-blue-600 hover:text-blue-800 font-medium">Términos y Condiciones</a> 
+                y la 
+                <a href="#" class="text-blue-600 hover:text-blue-800 font-medium">Política de Privacidad</a> 
+                del Instituto Cajas. Confirmo que la información proporcionada es verídica.
+              </label>
+            </div>
+          </div>
+
+          <!-- Botón de registro -->
+          <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <button
+              type="submit"
+              id="registerBtn"
+              class="btn-primary w-full md:w-auto px-8 py-3 rounded-lg text-white font-semibold shadow-lg hover:shadow-xl transition-all"
+            >
+              <i class="fas fa-user-plus mr-2"></i>Completar Registro
+            </button>
+            
+            <div class="text-sm text-gray-600 text-center md:text-right">
+              <p>¿Ya tiene una cuenta? 
+                <a href="login.html" class="text-blue-600 hover:text-blue-800 font-medium">Iniciar Sesión</a>
+              </p>
+            </div>
+          </div>
+
+          <!-- Mensaje de estado -->
+          <div id="form-message" class="hidden mt-6 p-4 rounded-lg border">
+            <div class="flex items-center gap-3">
+              <i id="msg-icon" class="fas fa-info-circle text-lg"></i>
+              <span id="msg-text" class="text-sm font-medium"></span>
+            </div>
+          </div>
+        </form>
+
+        <!-- Footer de seguridad -->
+        <div class="bg-gray-50 px-8 py-4 border-t border-gray-200">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+              <div class="flex items-center">
+                <i class="fas fa-shield-alt text-green-500 mr-2"></i>
+                <span class="text-sm text-gray-600">Conexión Segura SSL</span>
+              </div>
+              <div class="flex items-center">
+                <i class="fas fa-lock text-blue-500 mr-2"></i>
+                <span class="text-sm text-gray-600">Datos Encriptados</span>
+              </div>
+            </div>
+            <div class="text-xs text-gray-500">
+              <i class="fas fa-clock mr-1"></i>Última actualización: Hoy
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function togglePassword() {
+      const passwordInput = document.getElementById('password');
+      const icon = event.currentTarget.querySelector('i');
+      
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.className = 'fas fa-eye-slash text-gray-600';
+      } else {
+        passwordInput.type = 'password';
+        icon.className = 'fas fa-eye text-gray-400';
+      }
+    }
+
+    // Mejoras visuales para selects
+    document.querySelectorAll('select').forEach(select => {
+      select.addEventListener('focus', function() {
+        this.parentElement.classList.add('ring-2', 'ring-blue-200');
+      });
+      
+      select.addEventListener('blur', function() {
+        this.parentElement.classList.remove('ring-2', 'ring-blue-200');
+      });
+    });
+
+    // El resto del código de registro se mantiene igual...
+    (function () {
+      "use strict";
+
+      const form = document.getElementById('registerForm');
+      const btn = document.getElementById('registerBtn');
+      const msgBox = document.getElementById('form-message');
+      const msgText = document.getElementById('msg-text');
+      const msgIcon = document.getElementById('msg-icon');
+
+      function showMessage(text, type) {
+        msgBox.classList.remove('hidden');
+        msgBox.classList.remove('bg-red-50', 'border-red-200', 'text-red-700');
+        msgBox.classList.remove('bg-green-50', 'border-green-200', 'text-green-700');
+
+        if (type === 'success') {
+          msgBox.classList.add('bg-green-50', 'border', 'border-green-200', 'text-green-700');
+          msgIcon.className = 'fas fa-check-circle text-lg';
+        } else {
+          msgBox.classList.add('bg-red-50', 'border', 'border-red-200', 'text-red-700');
+          msgIcon.className = 'fas fa-exclamation-circle text-lg';
+        }
+
+        msgText.textContent = text;
+      }
+
+      function normalizeEmail(v) {
+        return (v || '').trim().toLowerCase();
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const payload = {
+          correo_institucional: normalizeEmail(document.getElementById('correo_institucional').value),
+          password: document.getElementById('password').value,
+          codigo_verificacion: (document.getElementById('codigo_verificacion').value || '').trim(),
+          dni_est: (document.getElementById('dni_est').value || '').trim(),
+          ap_est: (document.getElementById('ap_est').value || '').trim(),
+          am_est: (document.getElementById('am_est').value || '').trim(),
+          nom_est: (document.getElementById('nom_est').value || '').trim(),
+          sex_est: (document.getElementById('sex_est').value || '').trim(),
+          cel_est: (document.getElementById('cel_est').value || '').trim(),
+          fecnac_est: (document.getElementById('fecnac_est').value || '').trim(),
+          dir_est: (document.getElementById('dir_est').value || '').trim(),
+          mailp_est: normalizeEmail(document.getElementById('mailp_est').value),
+          ubigeodir_est: (document.getElementById('ubigeodir_est').value || '').trim(),
+          ubigeonac_est: (document.getElementById('ubigeonac_est').value || '').trim()
+        };
+
+        btn.disabled = true;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Procesando...';
+
+        try {
+          const res = await fetch('registrar.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          const text = await res.text();
+          let data = {};
+          try { data = text ? JSON.parse(text) : {}; } catch (_) { data = {}; }
+
+          if (!res.ok) {
+            showMessage(data?.error || data?.message || 'No se pudo completar el registro', 'error');
+            return;
+          }
+
+          showMessage(data?.message || 'Registro exitoso. Redirigiendo al login...', 'success');
+          setTimeout(() => {
+            window.location.href = 'login.html';
+          }, 1800);
+
+        } catch (err) {
+          console.error(err);
+          showMessage('Error inesperado. Inténtalo de nuevo.', 'error');
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -47,7 +47,8 @@ $oldValue = function (string $key) use ($previousData): string {
 };
 ?>
 
-<h2 class="text-2xl font-bold mb-6">Gestión de Personal Bienestar</h2>
+<h2 class="text-2xl font-bold mb-2">Empleados (sin credenciales)</h2>
+<p class="text-gray-600 mb-6">Aquí se muestran los empleados que aún no tienen acceso al sistema. Usa <span class="font-semibold">Asignar credenciales</span> para crear su usuario de Bienestar o Dirección.</p>
 
 <?php if (!empty($alerts)): ?>
     <?php foreach ($alerts as $alert): ?>
@@ -118,7 +119,10 @@ $oldValue = function (string $key) use ($previousData): string {
         </td>
 
         <td class="p-2">
-            <a href="<?= htmlspecialchars($redirectUrl, ENT_QUOTES, 'UTF-8') ?>&delete=<?= (int) $e['id'] ?>" class="text-red-600 hover:underline">Eliminar</a>
+            <div class="flex items-center gap-3">
+                <a href="dashboard-admin.php?pagina=panel-admin&modulo=admin-usuarios-sistema&asignar=<?= (int) $e['id'] ?>" class="text-blue-700 hover:underline">Asignar credenciales</a>
+                <a href="<?= htmlspecialchars($redirectUrl, ENT_QUOTES, 'UTF-8') ?>&delete=<?= (int) $e['id'] ?>" class="text-red-600 hover:underline" onclick="return confirm('¿Eliminar empleado? Esta acción no asigna ni revoca accesos, elimina el registro del empleado.')">Eliminar</a>
+            </div>
         </td>
     </tr>
     <?php endforeach ?>
