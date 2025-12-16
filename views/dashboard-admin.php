@@ -795,19 +795,9 @@ function activo($id, $pagina){
         <span>ADMINISTRAR USUARIOS</span>
       </button>
 
-      <button onclick="window.location='?pagina=admin-resoluciones'" class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-colors duration-200 <?= activo('admin-resoluciones', $pagina) ?>">
-        <i class="fas fa-file-signature text-xl"></i>
-        <span>RESOLUCIONES</span>
-      </button>
-
       <button onclick="window.location='?pagina=admin-caja'" class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-colors duration-200 <?= activo('admin-caja', $pagina) ?>">
         <i class="fas fa-cash-register text-xl"></i>
         <span>ADMINISTRAR CAJA</span>
-      </button>
-
-      <button onclick="window.location='?pagina=admin-sistema'" class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-colors duration-200 <?= activo('admin-sistema', $pagina) ?>">
-        <i class="fas fa-gears text-xl"></i>
-        <span>ADMINISTRAR SISTEMA</span>
       </button>
     </nav>
 
