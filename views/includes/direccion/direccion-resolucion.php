@@ -331,9 +331,10 @@ try {
                                     </label>
                                     <div class="flex flex-wrap gap-3">
                                         <?php foreach($evidenciasValidas as $archivo): 
-                                            $ruta = "../uploads/solicitudes/" . rawurlencode($archivo);
+                                            $archivo = ltrim((string)$archivo, '/\\');
+                                            $ruta = '../' . $archivo;
                                             $ext = strtolower(pathinfo($archivo, PATHINFO_EXTENSION));
-                                            $archivoSeguro = htmlspecialchars($archivo, ENT_QUOTES, 'UTF-8');
+                                            $archivoSeguro = htmlspecialchars(basename($archivo), ENT_QUOTES, 'UTF-8');
                                             
                                             if (in_array($ext, ['jpg','jpeg','png','gif','webp'])): 
                                         ?>
