@@ -70,7 +70,8 @@ class ResolucionModel {
         ];
 
         $campos[] = 'estado';
-        $valores[] = 'true';
+        $valores[] = ':estado';
+        $params[':estado'] = isset($data['estado']) ? (bool)$data['estado'] : false;
 
         if ($creadoPor !== null && $creadoPor > 0) {
             $campos[] = 'creado_por';
@@ -105,6 +106,88 @@ class ResolucionModel {
         ");
         $sql->execute();
         return $sql->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function listarTodas() {
+        $sql = $this->db->prepare("
+            SELECT 
+                r.id,
+                r.numero_resolucion,
+                r.titulo,
+                r.texto_respaldo,
+                r.monto_descuento,
+                r.tipo_pago,
+                r.ruta_documento,
+                r.fecha_inicio,
+                r.fecha_fin,
+                r.creado_en,
+                r.estado,
+                e.apnom_emp AS creado_por_nombre
+            FROM resoluciones r
+            LEFT JOIN empleado e ON e.id = r.creado_por
+            ORDER BY r.creado_en DESC
+        ");
+        $sql->execute();
+        return $sql->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function listarPendientes() {
+        $sql = $this->db->prepare("
+            SELECT 
+                r.id,
+                r.numero_resolucion,
+                r.titulo,
+                r.texto_respaldo,
+                r.monto_descuento,
+                r.tipo_pago,
+                r.ruta_documento,
+                r.fecha_inicio,
+                r.fecha_fin,
+                r.creado_en,
+                r.estado,
+                e.apnom_emp AS creado_por_nombre
+            FROM resoluciones r
+            LEFT JOIN empleado e ON e.id = r.creado_por
+            WHERE r.estado = false
+            ORDER BY r.creado_en DESC
+        ");
+        $sql->execute();
+        return $sql->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function actualizarCampos($id, $data) {
+        $set = [];
+        $params = [':id' => (int)$id];
+
+        if (array_key_exists('monto_descuento', $data)) {
+            $set[] = 'monto_descuento = :monto_descuento';
+            $params[':monto_descuento'] = $data['monto_descuento'] !== null ? (float)$data['monto_descuento'] : null;
+        }
+
+        if (array_key_exists('fecha_fin', $data)) {
+            $set[] = 'fecha_fin = :fecha_fin';
+            $params[':fecha_fin'] = $data['fecha_fin'] !== '' ? $data['fecha_fin'] : null;
+        }
+
+        if (empty($set)) {
+            return false;
+        }
+
+        $sql = $this->db->prepare('UPDATE resoluciones SET ' . implode(', ', $set) . ' WHERE id = :id');
+        return $sql->execute($params);
+    }
+
+    public function cambiarEstado($id, $estado) {
+        $sql = $this->db->prepare('UPDATE resoluciones SET estado = :estado WHERE id = :id');
+        return $sql->execute([
+            ':estado' => (bool)$estado,
+            ':id' => (int)$id
+        ]);
+    }
+
+    public function eliminar($id) {
+        $sql = $this->db->prepare('DELETE FROM resoluciones WHERE id = :id');
+        return $sql->execute([':id' => (int)$id]);
     }
 
     public function obtenerPorId($id) {

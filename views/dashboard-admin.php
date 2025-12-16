@@ -690,6 +690,11 @@ switch($pagina){
         $icono = 'fa-users-gear';
         $archivo = 'viewsaduser';
         break;
+    case 'admin-resoluciones':
+        $titulo = 'RESOLUCIONES';
+        $icono = 'fa-file-signature';
+        $archivo = 'admin-resoluciones';
+        break;
     case 'admin-caja':
         $titulo = 'ADMINISTRAR CAJA';
         $icono = 'fa-cash-register';
@@ -788,6 +793,11 @@ function activo($id, $pagina){
       <button onclick="window.location='?pagina=panel-admin'" class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-colors duration-200 <?= activo('panel-admin', $pagina) ?>">
         <i class="fas fa-users-gear text-xl"></i>
         <span>ADMINISTRAR USUARIOS</span>
+      </button>
+
+      <button onclick="window.location='?pagina=admin-resoluciones'" class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-colors duration-200 <?= activo('admin-resoluciones', $pagina) ?>">
+        <i class="fas fa-file-signature text-xl"></i>
+        <span>RESOLUCIONES</span>
       </button>
 
       <button onclick="window.location='?pagina=admin-caja'" class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-colors duration-200 <?= activo('admin-caja', $pagina) ?>">

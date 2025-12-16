@@ -15,6 +15,7 @@ if ($dniAside === '') {
 
 // Definir menú con iconos de Font Awesome
 $menu = [
+    'direccion-gestion-resoluciones' => ['icon' => 'fa-file-signature', 'texto' => 'RESOLUCIONES'],
     'direccion-resolucion' => ['icon' => 'fa-bell', 'texto' => 'NOTIFICACIONES'],
     'reportes-direccion'   => ['icon' => 'fa-chart-bar', 'texto' => 'REPORTES'],
 ];

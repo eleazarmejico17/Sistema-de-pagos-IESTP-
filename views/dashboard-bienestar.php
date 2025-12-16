@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             
             // Validaciones básicas
-            if (empty($data['numero_resolucion']) || empty($data['titulo']) || empty($data['fecha_inicio'])) {
+            if (empty($data['numero_resolucion']) || empty($data['titulo'])) {
                 throw new Exception('Los campos obligatorios deben ser completados.');
             }
 
@@ -123,8 +123,8 @@ $pagina = isset($_GET['pagina']) ? $_GET['pagina'] : 'registro-bienestar-estudia
 // Definir título e icono Font Awesome según página
 switch($pagina){
     case 'registro-bienestar-estudiantil':
-        $titulo = 'NUEVO';
-        $icono  = 'fa-plus';
+        $titulo = 'RESOLUCIONES';
+        $icono  = 'fa-file-signature';
         break;
 
     case 'reportes-bienestar-estudiantil':
@@ -233,19 +233,19 @@ function activo($id, $pagina){
         <!-- MENÚ -->
         <nav class="flex flex-col gap-3 px-5">
 
+            <button onclick="window.location='?pagina=solicitud-bienestar-estudiantil'"
+                class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold <?= activo('solicitud-bienestar-estudiantil', $pagina) ?>">
+                <i class="fas fa-file-alt text-xl"></i> SOLICITUDES
+            </button>
+
             <button onclick="window.location='?pagina=registro-bienestar-estudiantil'"
                 class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold <?= activo('registro-bienestar-estudiantil', $pagina) ?>">
-                <i class="fas fa-plus text-xl"></i> NUEVO
+                <i class="fas fa-file-signature text-xl"></i> RESOLUCIONES
             </button>
 
             <button onclick="window.location='?pagina=reportes-bienestar-estudiantil'"
                 class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold <?= activo('reportes-bienestar-estudiantil', $pagina) ?>">
                 <i class="fas fa-chart-bar text-xl"></i> REPORTES
-            </button>
-
-            <button onclick="window.location='?pagina=solicitud-bienestar-estudiantil'"
-                class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold <?= activo('solicitud-bienestar-estudiantil', $pagina) ?>">
-                <i class="fas fa-file-alt text-xl"></i> SOLICITUDES
             </button>
 
             <button onclick="window.location='?pagina=notificaciones-bienestar'"

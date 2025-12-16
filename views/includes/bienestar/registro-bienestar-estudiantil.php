@@ -10,7 +10,7 @@ $alerts = [];
 
 // Mostrar mensaje de éxito al registrar resolución y mensaje de error cuando falle
 if ($status === 'resolucion_created') {
-    $alerts[] = ['type' => 'success', 'text' => 'Resolución registrada exitosamente.'];
+    $alerts[] = ['type' => 'success', 'text' => 'Resolución registrada y enviada a aprobación del Director.'];
 } elseif ($status === 'error') {
     $alerts[] = ['type' => 'error', 'text' => 'Ocurrió un problema al procesar la solicitud.'];
 }
@@ -35,6 +35,31 @@ try {
     $tiposPago = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     $tiposPago = [];
+}
+
+// Estadísticas de resoluciones (activas / no activas / disponibles)
+$statsResoluciones = [
+    'activas' => 0,
+    'no_activas' => 0,
+    'disponibles' => 0,
+];
+try {
+    if (isset($pdo) && $pdo instanceof PDO) {
+        $stmtActivas = $pdo->query("SELECT COUNT(*) FROM resoluciones WHERE estado = true");
+        $statsResoluciones['activas'] = (int)($stmtActivas->fetchColumn() ?: 0);
+
+        $stmtNoActivas = $pdo->query("SELECT COUNT(*) FROM resoluciones WHERE estado = false");
+        $statsResoluciones['no_activas'] = (int)($stmtNoActivas->fetchColumn() ?: 0);
+
+        $stmtDisponibles = $pdo->query("SELECT COUNT(*) FROM resoluciones");
+        $statsResoluciones['disponibles'] = (int)($stmtDisponibles->fetchColumn() ?: 0);
+    }
+} catch (Throwable $e) {
+    $statsResoluciones = [
+        'activas' => 0,
+        'no_activas' => 0,
+        'disponibles' => 0,
+    ];
 }
 
 $oldValue = function (string $key) use ($previousData): string {
@@ -124,6 +149,46 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 <?php endif; ?>
 
 <!-- Grid de Formularios -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto mb-6">
+
+    <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 rounded-xl shadow-sm p-5 card-anim">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-green-800 text-sm font-medium">Resoluciones activas</p>
+                <p class="text-2xl font-bold text-green-900 mt-1"><?= number_format($statsResoluciones['activas']) ?></p>
+            </div>
+            <div class="bg-green-100 rounded-full p-3">
+                <i class="fas fa-check-circle text-green-600"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-100 rounded-xl shadow-sm p-5 card-anim">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-yellow-800 text-sm font-medium">Resoluciones no activas</p>
+                <p class="text-2xl font-bold text-yellow-900 mt-1"><?= number_format($statsResoluciones['no_activas']) ?></p>
+            </div>
+            <div class="bg-yellow-100 rounded-full p-3">
+                <i class="fas fa-hourglass-half text-yellow-600"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-100 rounded-xl shadow-sm p-5 card-anim">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-blue-800 text-sm font-medium">Resoluciones disponibles</p>
+                <p class="text-2xl font-bold text-blue-900 mt-1"><?= number_format($statsResoluciones['disponibles']) ?></p>
+            </div>
+            <div class="bg-blue-100 rounded-full p-3">
+                <i class="fas fa-file-alt text-blue-600"></i>
+            </div>
+        </div>
+    </div>
+
+</section>
+
 <section class="grid grid-cols-1 xl:grid-cols-1 gap-6 max-w-4xl mx-auto">
 
     <!-- Formulario Resolución -->
@@ -137,7 +202,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
                 </div>
                 <div>
                     <h3 class="text-white font-bold text-2xl mb-1">Nueva Resolución</h3>
-                    <p class="text-white/90 text-sm font-medium">Registrar resolución institucional</p>
+                    <p class="text-white/90 text-sm font-medium">Queda pendiente para aprobación del Director</p>
                 </div>
             </div>
         </div>
@@ -178,33 +243,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
                     placeholder="Título de la resolución">
             </div>
 
-            <!-- Fechas y monto de descuento -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="md:col-span-1">
-                    <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                        <i class="fas fa-calendar-alt text-blue-600"></i>
-                        <span>Fecha Resolución</span>
-                        <span class="text-red-500">*</span>
-                    </label>
-                    <input 
-                        type="date" 
-                        name="fecha_inicio" 
-                        required
-                        value="<?= $oldValue('fecha_inicio') ?>" 
-                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm font-medium shadow-sm hover:border-gray-400">
-                </div>
-                <div class="md:col-span-1">
-                    <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                        <i class="fas fa-calendar-times text-blue-600"></i>
-                        <span>Fecha Fin</span>
-                    </label>
-                    <input 
-                        type="date" 
-                        name="fecha_fin" 
-                        value="<?= $oldValue('fecha_fin') ?>" 
-                        class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm font-medium shadow-sm hover:border-gray-400">
-                </div>
-                <div class="md:col-span-1">
+            <!-- Monto de descuento -->
+            <div class="grid grid-cols-1 md:grid-cols-1 gap-4">
+                <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
                         <i class="fas fa-money-bill-wave text-blue-600"></i>
                         <span>Monto de Descuento</span>
@@ -224,6 +265,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
                     </div>
                 </div>
             </div>
+
+            <input type="hidden" name="fecha_inicio" value="">
+            <input type="hidden" name="fecha_fin" value="">
 
             <div>
                 <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
@@ -366,20 +410,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                        <i class="fas fa-calendar-alt text-emerald-600"></i>
-                        <span>Fecha Inicio</span>
-                    </label>
-                    <input type="date" name="fecha_inicio" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl">
-                </div>
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
-                        <i class="fas fa-calendar-times text-emerald-600"></i>
-                        <span>Fecha Fin</span>
-                    </label>
-                    <input type="date" name="fecha_fin" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl">
-                </div>
+                <input type="hidden" name="fecha_inicio" value="">
+                <input type="hidden" name="fecha_fin" value="">
             </div>
 
             <div class="pt-4">
