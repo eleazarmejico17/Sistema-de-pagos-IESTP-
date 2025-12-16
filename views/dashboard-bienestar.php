@@ -13,6 +13,15 @@ if ($_SESSION['rol'] !== 'bienestar') {
     exit;
 }
 
+$nombreAside = trim((string)($_SESSION['nombre'] ?? ''));
+$dniAside = trim((string)($_SESSION['dni'] ?? ''));
+if ($dniAside === '') {
+    $userSesion = (string)($_SESSION['usuario'] ?? '');
+    if (preg_match('/^(\d{8})@/i', $userSesion, $m)) {
+        $dniAside = $m[1];
+    }
+}
+
 // Procesar formularios si se envían (ANTES de cualquier output HTML)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once __DIR__ . '/../controller/bienestar-registroController.php';
@@ -148,8 +157,8 @@ if (file_exists("includes/bienestar/{$pagina}.php")) {
 // Función para botón activo
 function activo($id, $pagina){
     return $id === $pagina 
-        ? 'bg-gradient-to-r from-blue-600 to-blue-400 text-white' 
-        : 'text-white/80 hover:bg-gradient-to-r hover:from-blue-500 hover:to-blue-400';
+        ? 'bg-blue-600 text-white'
+        : 'text-white/80 hover:bg-white/10';
 }
 ?>
 <!DOCTYPE html>
@@ -207,6 +216,15 @@ function activo($id, $pagina){
                     <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </span>
                 <p class="text-sm text-gray-300">Bienestar</p>
+            </div>
+
+            <div class="mt-3 text-center">
+              <?php if ($nombreAside !== ''): ?>
+                <div class="text-sm font-semibold text-white/90"><?= htmlspecialchars($nombreAside, ENT_QUOTES, 'UTF-8') ?></div>
+              <?php endif; ?>
+              <?php if ($dniAside !== ''): ?>
+                <div class="text-xs text-gray-300">DNI: <?= htmlspecialchars($dniAside, ENT_QUOTES, 'UTF-8') ?></div>
+              <?php endif; ?>
             </div>
         </div>
 

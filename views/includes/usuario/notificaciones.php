@@ -161,10 +161,11 @@ try {
 <?php foreach ($notificaciones as $notif): 
   $tipoNotif = $notif['tipo_notificacion'] ?? 'solicitud';
   $esPago = ($tipoNotif === 'pago');
+  $estadoNorm = strtolower(trim((string)($notif['estado'] ?? '')));
 ?>
 <div class="mb-4">
 
-<?php if ($notif['estado'] == 'Rechazado'): ?>
+<?php if (!$esPago && $estadoNorm === 'rechazado'): ?>
 
 <!-- TARJETA RECHAZADA -->
 <div onclick="toggleNotificacion(this)"
@@ -200,6 +201,25 @@ try {
       <span class="inline-block bg-red-50 text-red-700 text-xs font-semibold px-3 py-1 rounded-full mt-1">
         N°<?= $notif['id'] ?> <?= htmlspecialchars($notif['tipo_solicitud']) ?>
       </span>
+    </div>
+
+    <div class="mt-4">
+      <button onclick="event.stopPropagation(); toggleDatosSolicitud(this)"
+              class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition">
+        Ver datos de la solicitud
+      </button>
+      <div class="datos-solicitud hidden mt-3 p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm text-gray-700 space-y-2">
+        <p><strong>Tipo:</strong> <?= htmlspecialchars((string)($notif['tipo_solicitud'] ?? 'N/A'), ENT_QUOTES, 'UTF-8') ?></p>
+        <p><strong>Descripción:</strong> <?= htmlspecialchars((string)($notif['descripcion'] ?? 'N/A'), ENT_QUOTES, 'UTF-8') ?></p>
+        <p><strong>Fecha solicitud:</strong> <?= !empty($notif['fecha']) ? date('d/m/Y H:i', strtotime($notif['fecha'])) : 'N/A' ?></p>
+        <p><strong>Fecha respuesta:</strong> <?= !empty($notif['fecha_respuesta']) ? date('d/m/Y H:i', strtotime($notif['fecha_respuesta'])) : 'N/A' ?></p>
+        <?php if (!empty($notif['correo'])): ?>
+          <p><strong>Correo:</strong> <?= htmlspecialchars((string)$notif['correo'], ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
+        <?php if (!empty($notif['telefono'])): ?>
+          <p><strong>Teléfono:</strong> <?= htmlspecialchars((string)$notif['telefono'], ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
+      </div>
     </div>
 
 <?php if ($notif['archivos']): ?>
@@ -261,6 +281,14 @@ try {
         <?= $notif['fecha_respuesta'] ? date('d/m/Y H:i', strtotime($notif['fecha_respuesta'])) : 'Hoy' ?>
       </span>
     </div>
+
+    <div class="mt-4">
+      <a onclick="event.stopPropagation();"
+         href="?pagina=comprobantes<?= !empty($notif['referencia_id']) ? '&pago_id=' . urlencode((string)$notif['referencia_id']) : '' ?>"
+         class="inline-block px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition">
+        Ver comprobante
+      </a>
+    </div>
   </div>
 
 </div>
@@ -290,6 +318,25 @@ try {
       <span class="inline-block bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full">
         N°<?= $notif['id'] ?> <?= htmlspecialchars($notif['tipo_solicitud']) ?>
       </span>
+    </div>
+
+    <div class="mt-4">
+      <button onclick="event.stopPropagation(); toggleDatosSolicitud(this)"
+              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">
+        Ver datos de la solicitud
+      </button>
+      <div class="datos-solicitud hidden mt-3 p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm text-gray-700 space-y-2">
+        <p><strong>Tipo:</strong> <?= htmlspecialchars((string)($notif['tipo_solicitud'] ?? 'N/A'), ENT_QUOTES, 'UTF-8') ?></p>
+        <p><strong>Descripción:</strong> <?= htmlspecialchars((string)($notif['descripcion'] ?? 'N/A'), ENT_QUOTES, 'UTF-8') ?></p>
+        <p><strong>Fecha solicitud:</strong> <?= !empty($notif['fecha']) ? date('d/m/Y H:i', strtotime($notif['fecha'])) : 'N/A' ?></p>
+        <p><strong>Fecha respuesta:</strong> <?= !empty($notif['fecha_respuesta']) ? date('d/m/Y H:i', strtotime($notif['fecha_respuesta'])) : 'N/A' ?></p>
+        <?php if (!empty($notif['correo'])): ?>
+          <p><strong>Correo:</strong> <?= htmlspecialchars((string)$notif['correo'], ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
+        <?php if (!empty($notif['telefono'])): ?>
+          <p><strong>Teléfono:</strong> <?= htmlspecialchars((string)$notif['telefono'], ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
+      </div>
     </div>
   </div>
 
@@ -326,6 +373,14 @@ function toggleNotificacion(card){
   document.querySelectorAll('.detalle-notificacion').forEach(d => d.classList.add('hidden'));
 
   if (!abierta) detalle.classList.remove('hidden');
+}
+
+function toggleDatosSolicitud(btn){
+  const detalle = btn.closest('.detalle-notificacion');
+  if (!detalle) return;
+  const datos = detalle.querySelector('.datos-solicitud');
+  if (!datos) return;
+  datos.classList.toggle('hidden');
 }
 
 function abrirImagen(src){

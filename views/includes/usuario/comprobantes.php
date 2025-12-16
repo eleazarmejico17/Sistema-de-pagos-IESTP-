@@ -10,6 +10,14 @@ if (session_status() === PHP_SESSION_NONE) {
 $estudianteId = null;
 $usuarioSesion = $_SESSION['usuario'] ?? '';
 
+$pagoIdFiltro = null;
+if (isset($_GET['pago_id'])) {
+    $pagoIdFiltro = (int)$_GET['pago_id'];
+    if ($pagoIdFiltro <= 0) {
+        $pagoIdFiltro = null;
+    }
+}
+
 if (!empty($usuarioSesion)) {
     $db = Conexion::getInstance()->getConnection();
     
@@ -97,11 +105,20 @@ try {
             FROM pagos p
             INNER JOIN tipo_pago tp ON tp.id = p.tipo_pago
             WHERE p.{$columnaEstudiante} = :estudiante_id
+        ";
+
+        $params = [':estudiante_id' => $estudianteId];
+        if ($pagoIdFiltro !== null) {
+            $sql .= " AND p.id = :pago_id";
+            $params[':pago_id'] = $pagoIdFiltro;
+        }
+
+        $sql .= "
             ORDER BY p.fecha_pago DESC, p.registrado_en DESC
         ";
         
         $stmt = $db->prepare($sql);
-        $stmt->execute([':estudiante_id' => $estudianteId]);
+        $stmt->execute($params);
         $pagos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } else {
         // Si no se encuentra estudiante específico, mostrar todos los pagos recientes (últimos 20)
@@ -119,12 +136,21 @@ try {
                 p.{$columnaEstudiante} AS estudiante_id
             FROM pagos p
             INNER JOIN tipo_pago tp ON tp.id = p.tipo_pago
+        ";
+
+        $params = [];
+        if ($pagoIdFiltro !== null) {
+            $sql .= " WHERE p.id = :pago_id";
+            $params[':pago_id'] = $pagoIdFiltro;
+        }
+
+        $sql .= "
             ORDER BY p.fecha_pago DESC, p.registrado_en DESC
             LIMIT 20
         ";
         
         $stmt = $db->prepare($sql);
-        $stmt->execute();
+        $stmt->execute($params);
         $pagos = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Si hay pagos, obtener información del primer estudiante encontrado
@@ -254,6 +280,68 @@ function obtenerColorHover($index) {
         <p class="text-gray-500">Aún no has realizado ningún pago. Los comprobantes aparecerán aquí después de completar un pago.</p>
       </div>
     <?php else: ?>
+      <?php if ($pagoIdFiltro !== null && count($pagos) === 1): 
+        $pago = $pagos[0];
+        $estInfoPago = $pago['estudiante_info'] ?? $estudianteInfo;
+        $codigoEstudiante = $estInfoPago['id_matricula'] ?? $estInfoPago['id'] ?? $pago['id'] ?? 'N/A';
+        $nombreCompleto = $estInfoPago['nombre_completo'] ?? 'Estudiante';
+        $dni = $estInfoPago['dni_est'] ?? 'N/A';
+        $fechaPago = $pago['fecha_pago'] ? date('d/m/Y', strtotime($pago['fecha_pago'])) : 
+                    ($pago['registrado_en'] ? date('d/m/Y', strtotime($pago['registrado_en'])) : date('d/m/Y'));
+        $montoOriginal = number_format((float)($pago['monto_original'] ?? 0), 2, '.', ',');
+        $montoDescuento = number_format((float)($pago['monto_descuento'] ?? 0), 2, '.', ',');
+        $montoFinal = number_format((float)($pago['monto_final'] ?? 0), 2, '.', ',');
+        $concepto = !empty($pago['tipo_pago_descripcion']) ? $pago['tipo_pago_descripcion'] : 
+                   (!empty($pago['tipo_pago_nombre']) ? $pago['tipo_pago_nombre'] : 'Pago');
+        $serie = 'PAG-' . date('Y');
+        $numero = str_pad($pago['id'], 6, '0', STR_PAD_LEFT);
+      ?>
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 class="text-2xl font-bold text-gray-800">Detalle del comprobante</h2>
+              <p class="text-sm text-gray-600">Pago #<?= htmlspecialchars((string)$pago['id'], ENT_QUOTES, 'UTF-8') ?></p>
+            </div>
+            <a href="?pagina=comprobantes" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-medium text-center">
+              Volver a la lista
+            </a>
+          </div>
+
+          <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-gray-50 rounded-xl border p-4">
+              <div class="font-semibold text-gray-700 mb-3">Información del estudiante</div>
+              <div class="text-sm text-gray-700 space-y-1">
+                <div><strong>Código:</strong> <?= htmlspecialchars((string)$codigoEstudiante, ENT_QUOTES, 'UTF-8') ?></div>
+                <div><strong>Alumno:</strong> <?= htmlspecialchars((string)$nombreCompleto, ENT_QUOTES, 'UTF-8') ?></div>
+                <div><strong>DNI:</strong> <?= htmlspecialchars((string)$dni, ENT_QUOTES, 'UTF-8') ?></div>
+              </div>
+            </div>
+
+            <div class="bg-gray-50 rounded-xl border p-4">
+              <div class="font-semibold text-gray-700 mb-3">Información del comprobante</div>
+              <div class="text-sm text-gray-700 space-y-1">
+                <div><strong>Concepto:</strong> <?= htmlspecialchars((string)$concepto, ENT_QUOTES, 'UTF-8') ?></div>
+                <div><strong>Serie:</strong> <?= htmlspecialchars((string)$serie, ENT_QUOTES, 'UTF-8') ?></div>
+                <div><strong>Número:</strong> <?= htmlspecialchars((string)$numero, ENT_QUOTES, 'UTF-8') ?></div>
+                <div><strong>Fecha:</strong> <?= htmlspecialchars((string)$fechaPago, ENT_QUOTES, 'UTF-8') ?></div>
+                <div class="mt-3">
+                  <div><strong>Monto original:</strong> S/ <?= htmlspecialchars((string)$montoOriginal, ENT_QUOTES, 'UTF-8') ?></div>
+                  <div><strong>Descuento:</strong> S/ <?= htmlspecialchars((string)$montoDescuento, ENT_QUOTES, 'UTF-8') ?></div>
+                  <div class="text-emerald-700 font-semibold"><strong>Total pagado:</strong> S/ <?= htmlspecialchars((string)$montoFinal, ENT_QUOTES, 'UTF-8') ?></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 flex flex-col sm:flex-row gap-3">
+            <button
+              onclick="descargarComprobante('<?= htmlspecialchars($concepto, ENT_QUOTES) ?>', '<?= htmlspecialchars($codigoEstudiante, ENT_QUOTES) ?>', '<?= htmlspecialchars($serie, ENT_QUOTES) ?>', '<?= htmlspecialchars($numero, ENT_QUOTES) ?>')"
+              class="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-medium transition flex items-center justify-center gap-2">
+              <i class="fas fa-download"></i> Descargar comprobante
+            </button>
+          </div>
+        </div>
+      <?php else: ?>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7">
         <?php foreach ($pagos as $index => $pago): 
           // Obtener información del estudiante para este pago
@@ -289,23 +377,11 @@ function obtenerColorHover($index) {
                 </div>
 
                 <div class="flex justify-between mt-5">
-                  <button 
-                    onclick="openModal({
-                      titulo: '<?= htmlspecialchars($concepto, ENT_QUOTES) ?>',
-                      codigo: '<?= htmlspecialchars($codigoEstudiante, ENT_QUOTES) ?>',
-                      alumno: '<?= htmlspecialchars($nombreCompleto, ENT_QUOTES) ?>',
-                      dni: '<?= htmlspecialchars($dni, ENT_QUOTES) ?>',
-                      estado: 'PAGADO',
-                      fecha: '<?= htmlspecialchars($fechaPago, ENT_QUOTES) ?>',
-                      monto: 'S/ <?= htmlspecialchars($monto, ENT_QUOTES) ?>',
-                      tipo: 'Recibo de Ingreso',
-                      serie: '<?= htmlspecialchars($serie, ENT_QUOTES) ?>',
-                      numero: '<?= htmlspecialchars($numero, ENT_QUOTES) ?>',
-                      descripcion: 'Pago realizado por concepto: <?= htmlspecialchars($concepto, ENT_QUOTES) ?>. Monto total: S/ <?= htmlspecialchars($monto, ENT_QUOTES) ?>.'
-                    })"
-                    class="px-4 py-2 border <?= $colorBorde ?> rounded-lg font-medium <?= $colorHover ?> transition">
+                  <a
+                    href="?pagina=comprobantes&pago_id=<?= urlencode((string)$pago['id']) ?>"
+                    class="px-4 py-2 border <?= $colorBorde ?> rounded-lg font-medium <?= $colorHover ?> transition text-center">
                     Ver
-                  </button>
+                  </a>
 
                   <button 
                     onclick="descargarComprobante('<?= htmlspecialchars($concepto, ENT_QUOTES) ?>', '<?= htmlspecialchars($codigoEstudiante, ENT_QUOTES) ?>', '<?= htmlspecialchars($serie, ENT_QUOTES) ?>', '<?= htmlspecialchars($numero, ENT_QUOTES) ?>')"
@@ -319,99 +395,11 @@ function obtenerColorHover($index) {
           </div>
         <?php endforeach; ?>
       </div>
+      <?php endif; ?>
     <?php endif; ?>
   </main>
 
-  <!-- === MODAL SUPER DETALLADO === -->
-  <div id="modal" class="fixed inset-0 hidden bg-black bg-opacity-40 flex justify-center items-center backdrop-blur-sm p-4 z-50">
-    <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl p-6 animate-fadeIn border border-gray-200">
-
-      <div class="flex justify-between items-center mb-4">
-        <h2 id="modalTitulo" class="text-2xl font-bold flex items-center gap-2">
-          <i class="fa-solid fa-file-invoice text-blue-600"></i>
-        </h2>
-        <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-      </div>
-
-      <!-- INFO GENERAL -->
-      <div class="mb-4">
-        <h3 class="font-semibold text-gray-700 mb-2">📌 Información del Estudiante</h3>
-        <div class="bg-gray-50 p-3 rounded-lg border">
-          <p><strong>Código:</strong> <span id="modalCodigo"></span></p>
-          <p><strong>Alumno:</strong> <span id="modalAlumno"></span></p>
-          <p><strong>DNI:</strong> <span id="modalDni"></span></p>
-        </div>
-      </div>
-
-      <!-- COMPROBANTE -->
-      <div class="mb-4">
-        <h3 class="font-semibold text-gray-700 mb-2">🧾 Información del Comprobante</h3>
-        <div class="bg-gray-50 p-3 rounded-lg border grid grid-cols-2 gap-2 text-sm">
-          <p><strong>Tipo:</strong> <span id="modalTipo"></span></p>
-          <p><strong>Serie:</strong> <span id="modalSerie"></span></p>
-          <p><strong>Número:</strong> <span id="modalNumero"></span></p>
-          <p><strong>Fecha:</strong> <span id="modalFecha"></span></p>
-        </div>
-      </div>
-
-      <!-- PAGO -->
-      <div class="mb-4">
-        <h3 class="font-semibold text-gray-700 mb-2">💰 Información del Pago</h3>
-        <div class="bg-gray-50 p-3 rounded-lg border">
-          <p><strong>Monto:</strong> <span id="modalMonto" class="font-semibold text-green-600"></span></p>
-          <p><strong>Estado:</strong> <span id="modalEstado" class="font-semibold text-green-600"></span></p>
-        </div>
-      </div>
-
-      <!-- DESCRIPCION -->
-      <div class="mb-4">
-        <h3 class="font-semibold text-gray-700 mb-2">📝 Descripción del Servicio</h3>
-        <div class="bg-gray-50 p-3 rounded-lg border text-sm">
-          <p id="modalDescripcion" class="leading-relaxed"></p>
-        </div>
-      </div>
-
-      <div class="flex justify-end mt-6">
-        <button onclick="closeModal()" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition">
-          Cerrar
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <style>
-    .animate-fadeIn { animation: fadeIn .3s ease-out forwards; }
-    @keyframes fadeIn { from { opacity:0; transform:scale(.95); } to { opacity:1; transform:scale(1); } }
-  </style>
-
   <script>
-    function openModal(data) {
-      document.getElementById("modalTitulo").innerHTML = '<i class="fa-solid fa-file-invoice text-blue-600"></i> ' + data.titulo;
-      document.getElementById("modalCodigo").innerText = data.codigo;
-      document.getElementById("modalAlumno").innerText = data.alumno;
-      document.getElementById("modalDni").innerText = data.dni;
-      document.getElementById("modalEstado").innerText = data.estado;
-      document.getElementById("modalFecha").innerText = data.fecha;
-      document.getElementById("modalMonto").innerText = data.monto;
-      document.getElementById("modalTipo").innerText = data.tipo;
-      document.getElementById("modalSerie").innerText = data.serie;
-      document.getElementById("modalNumero").innerText = data.numero;
-      document.getElementById("modalDescripcion").innerText = data.descripcion;
-
-      document.getElementById("modal").classList.remove("hidden");
-    }
-
-    function closeModal() {
-      document.getElementById("modal").classList.add("hidden");
-    }
-
-    // Cerrar modal al hacer clic fuera
-    document.getElementById("modal")?.addEventListener('click', function(e) {
-      if (e.target.id === 'modal') {
-        closeModal();
-      }
-    });
-
     function descargarComprobante(tipo, codigo, serie, numero) {
       // Construir la URL del controlador
       const currentPath = window.location.pathname;

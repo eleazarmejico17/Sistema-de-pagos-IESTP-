@@ -27,6 +27,9 @@ if ($tipoAcceso === 'admin') {
     if (hash_equals(strtolower($masterUser), $usuario) && hash_equals($masterPass, $password)) {
         $_SESSION['usuario'] = $usuario;
         $_SESSION['rol'] = 'admin';
+        $_SESSION['user_id'] = 0;
+        $_SESSION['nombre'] = 'Administrador';
+        $_SESSION['dni'] = '';
         echo json_encode(['redirect' => "../views/dashboard-admin.php"]);
         exit;
     }
@@ -93,9 +96,44 @@ try {
         $rol = 'usuario';
     }
 
+    $nombreSesion = '';
+    $dniSesion = '';
+    try {
+        if ($tipo === 2) {
+            if (!empty($row['estuempleado'])) {
+                $stmtEst = $db->prepare("SELECT dni_est, CONCAT(ap_est, ' ', am_est, ' ', nom_est) AS nombre FROM estudiante WHERE id = :id LIMIT 1");
+                $stmtEst->execute([':id' => (int)$row['estuempleado']]);
+                $est = $stmtEst->fetch(PDO::FETCH_ASSOC);
+                if ($est) {
+                    $nombreSesion = trim((string)($est['nombre'] ?? ''));
+                    $dniSesion = (string)($est['dni_est'] ?? '');
+                }
+            }
+
+            if ($dniSesion === '' && preg_match('/^(\d{8})@/i', $usuario, $m)) {
+                $dniSesion = $m[1];
+            }
+        } else {
+            if (!empty($row['estuempleado'])) {
+                $stmtEmp = $db->prepare("SELECT dni_emp, apnom_emp FROM empleado WHERE id = :id LIMIT 1");
+                $stmtEmp->execute([':id' => (int)$row['estuempleado']]);
+                $emp = $stmtEmp->fetch(PDO::FETCH_ASSOC);
+                if ($emp) {
+                    $nombreSesion = trim((string)($emp['apnom_emp'] ?? ''));
+                    $dniSesion = (string)($emp['dni_emp'] ?? '');
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        $nombreSesion = '';
+        $dniSesion = '';
+    }
+
     $_SESSION['usuario'] = $row['usuario'];
     $_SESSION['rol'] = $rol;
     $_SESSION['user_id'] = (int)$row['id'];
+    $_SESSION['nombre'] = $nombreSesion;
+    $_SESSION['dni'] = $dniSesion;
 
     echo json_encode(['redirect' => "../views/dashboard-{$rol}.php"]);
 } catch (Throwable $e) {

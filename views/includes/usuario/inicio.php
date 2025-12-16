@@ -7,6 +7,10 @@ require_once __DIR__ . '/../../../config/conexion.php';
 
 $db = Conexion::getInstance()->getConnection();
 
+$dniBeneficiario = isset($_GET['dni_beneficiario']) ? trim((string)$_GET['dni_beneficiario']) : '';
+$beneficioEncontrado = null;
+$beneficioError = null;
+
 $sessionUser = (string)($_SESSION['usuario'] ?? '');
 $dniSesion = null;
 if (preg_match('/^(\d{8})@institutocajas\.edu\.pe$/', $sessionUser, $m)) {
@@ -28,6 +32,55 @@ try {
   $resoluciones = $stmtRes->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
   $resoluciones = [];
+}
+
+try {
+  if ($dniBeneficiario !== '') {
+    if (!preg_match('/^\d{8}$/', $dniBeneficiario)) {
+      $beneficioError = 'Ingresa un DNI válido (8 dígitos).';
+    } else {
+      $stmtColsBen = $db->query('SHOW COLUMNS FROM beneficiarios');
+      $colsBen = $stmtColsBen->fetchAll(PDO::FETCH_COLUMN);
+
+      $colEstBen = in_array('estudiante', $colsBen, true) ? 'estudiante' : (in_array('estudiante_id', $colsBen, true) ? 'estudiante_id' : (in_array('id_estudiante', $colsBen, true) ? 'id_estudiante' : null));
+      $colResBen = in_array('resoluciones', $colsBen, true) ? 'resoluciones' : (in_array('resolucion_id', $colsBen, true) ? 'resolucion_id' : (in_array('id_resolucion', $colsBen, true) ? 'id_resolucion' : (in_array('resolucion', $colsBen, true) ? 'resolucion' : null)));
+
+      if ($colEstBen === null || $colResBen === null) {
+        throw new Exception('No se encontró la estructura esperada en la tabla beneficiarios.');
+      }
+
+      $sqlBenef = "
+        SELECT
+          b.id AS beneficiario_id,
+          b.activo,
+          r.id AS resolucion_id,
+          r.numero_resolucion,
+          r.titulo,
+          r.monto_descuento,
+          r.fecha_inicio,
+          r.fecha_fin,
+          e.id AS estudiante_id,
+          e.dni_est,
+          CONCAT(e.ap_est, ' ', e.am_est, ' ', e.nom_est) AS estudiante_nombre
+        FROM beneficiarios b
+        INNER JOIN estudiante e ON e.id = b.{$colEstBen}
+        INNER JOIN resoluciones r ON r.id = b.{$colResBen}
+        WHERE e.dni_est = :dni
+          AND COALESCE(b.activo, 1) = 1
+        ORDER BY COALESCE(r.fecha_inicio, r.id) DESC
+        LIMIT 1
+      ";
+
+      $stmtBenef = $db->prepare($sqlBenef);
+      $stmtBenef->execute([':dni' => $dniBeneficiario]);
+      $beneficioEncontrado = $stmtBenef->fetch(PDO::FETCH_ASSOC) ?: null;
+      if (!$beneficioEncontrado) {
+        $beneficioError = 'No se encontró un beneficio activo para ese DNI.';
+      }
+    }
+  }
+} catch (Throwable $e) {
+  $beneficioError = 'Error consultando beneficiario: ' . $e->getMessage();
 }
 
 $hoy = (new DateTime('now'))->format('Y-m-d');
@@ -165,6 +218,49 @@ foreach ($resoluciones as $r) {
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+      <h2 class="text-lg font-semibold text-gray-800 mb-4">Consultar beneficio por DNI</h2>
+      <form method="GET" class="flex flex-col sm:flex-row gap-3">
+        <input type="hidden" name="pagina" value="inicio">
+        <input
+          type="text"
+          name="dni_beneficiario"
+          value="<?= htmlspecialchars($dniBeneficiario, ENT_QUOTES, 'UTF-8') ?>"
+          placeholder="Ingresa DNI (8 dígitos)"
+          class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+        >
+        <button type="submit" class="px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg font-medium">
+          Buscar
+        </button>
+        <?php if ($dniBeneficiario !== ''): ?>
+          <a href="?pagina=inicio" class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-medium text-center">
+            Limpiar
+          </a>
+        <?php endif; ?>
+      </form>
+
+      <?php if ($beneficioError): ?>
+        <div class="mt-4 bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">
+          <?= htmlspecialchars($beneficioError, ENT_QUOTES, 'UTF-8') ?>
+        </div>
+      <?php elseif ($beneficioEncontrado): ?>
+        <div class="mt-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg p-4">
+          <div class="font-semibold">Beneficiario encontrado</div>
+          <div class="text-sm mt-1">
+            <div><strong>Estudiante:</strong> <?= htmlspecialchars((string)$beneficioEncontrado['estudiante_nombre'], ENT_QUOTES, 'UTF-8') ?> (DNI: <?= htmlspecialchars((string)$beneficioEncontrado['dni_est'], ENT_QUOTES, 'UTF-8') ?>)</div>
+            <div class="mt-2"><strong>Resolución:</strong> <?= htmlspecialchars((string)$beneficioEncontrado['numero_resolucion'], ENT_QUOTES, 'UTF-8') ?> - <?= htmlspecialchars((string)$beneficioEncontrado['titulo'], ENT_QUOTES, 'UTF-8') ?></div>
+            <div><strong>Monto descuento:</strong> S/ <?= number_format((float)($beneficioEncontrado['monto_descuento'] ?? 0), 2, '.', ',') ?></div>
+          </div>
+          <div class="mt-4">
+            <a href="?pagina=beneficiarios&resolucion_id=<?= urlencode((string)$beneficioEncontrado['resolucion_id']) ?>"
+               class="inline-block px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">
+              Ver beneficiarios de esta resolución
+            </a>
+          </div>
+        </div>
+      <?php endif; ?>
     </div>
 
     <?php if (!$estudiante): ?>

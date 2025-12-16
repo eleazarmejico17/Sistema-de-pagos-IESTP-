@@ -4,6 +4,15 @@ require_once __DIR__ . '/../public/aut.php';
 // Página actual
 $pagina = $_GET['pagina'] ?? 'direccion-resolucion';
 
+$nombreAside = trim((string)($_SESSION['nombre'] ?? ''));
+$dniAside = trim((string)($_SESSION['dni'] ?? ''));
+if ($dniAside === '') {
+    $userSesion = (string)($_SESSION['usuario'] ?? '');
+    if (preg_match('/^(\d{8})@/i', $userSesion, $m)) {
+        $dniAside = $m[1];
+    }
+}
+
 // Definir menú con iconos de Font Awesome
 $menu = [
     'direccion-resolucion' => ['icon' => 'fa-bell', 'texto' => 'NOTIFICACIONES'],
@@ -22,8 +31,8 @@ if (!file_exists($ruta)) {
 // Función para botón activo
 function activo($id, $pagina){
     return $id === $pagina 
-        ? 'bg-gradient-to-r from-blue-600 to-blue-400 text-white shadow-lg' 
-        : 'text-white/80 hover:bg-gradient-to-r hover:from-blue-500 hover:to-blue-400';
+        ? 'bg-blue-600 text-white'
+        : 'text-white/80 hover:bg-white/10';
 }
 ?>
 <!DOCTYPE html>
@@ -41,6 +50,8 @@ function activo($id, $pagina){
 
 .hover-lift {transition: all 0.3s ease;}
 .hover-lift:hover {transform: translateY(-4px) scale(1.02); box-shadow: 0 12px 24px rgba(0,0,0,0.1);}
+
+.hover-lift:hover {transform: none; box-shadow: none;}
 
 .glass-effect {
     backdrop-filter: blur(12px);
@@ -109,6 +120,15 @@ function activo($id, $pagina){
     </span>
     <p class="text-sm text-gray-300">Direccion</p>
   </div>
+
+  <div class="mt-3 text-center">
+    <?php if ($nombreAside !== ''): ?>
+      <div class="text-sm font-semibold text-white/90"><?= htmlspecialchars($nombreAside, ENT_QUOTES, 'UTF-8') ?></div>
+    <?php endif; ?>
+    <?php if ($dniAside !== ''): ?>
+      <div class="text-xs text-gray-300">DNI: <?= htmlspecialchars($dniAside, ENT_QUOTES, 'UTF-8') ?></div>
+    <?php endif; ?>
+  </div>
 </div>
 
 
@@ -117,11 +137,9 @@ function activo($id, $pagina){
     <!-- MENÚ -->
     <nav class="flex flex-col gap-3 px-5">
       <?php foreach($menu as $key => $item): ?>
-        <button onclick="window.location='?pagina=<?= $key ?>'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo($key, $pagina) ?>">
-          <span class="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-400 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-700"></span>
-          <span class="absolute inset-0 bg-white/5 group-hover:bg-white/10 rounded-2xl transition-all duration-700"></span>
-          <i class="fas <?= $item['icon'] ?> text-xl relative z-10"></i>
-          <span class="relative z-10"><?= $item['texto'] ?></span>
+        <button onclick="window.location='?pagina=<?= $key ?>'" class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-colors duration-200 <?= activo($key, $pagina) ?>">
+          <i class="fas <?= $item['icon'] ?> text-xl"></i>
+          <span><?= $item['texto'] ?></span>
         </button>
       <?php endforeach; ?>
     </nav>
@@ -157,7 +175,7 @@ document.getElementById('toggleSidebar').addEventListener('click', () => {
     </div>
   </header>
 
-  <div class="glass-effect rounded-3xl p-8 shadow-xl hover-lift section-content active">
+  <div class="glass-effect rounded-3xl p-8 shadow-xl section-content active">
     <?php
       if(file_exists($ruta)){
         include $ruta;

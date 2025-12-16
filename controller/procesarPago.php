@@ -3,6 +3,7 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../config/conexion.php';
+require_once __DIR__ . '/../models/NotificacionModel.php';
 
 try {
     // Verificar que el usuario esté autenticado
@@ -10,22 +11,45 @@ try {
         throw new Exception("Usuario no autenticado");
     }
 
-    // Obtener datos del POST
-    $input = file_get_contents("php://input");
-    $data = json_decode($input, true);
+    // Obtener datos del POST (soporta JSON y FormData)
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
+    $input = file_get_contents('php://input');
+    $data = null;
 
-    if (!$data) {
-        throw new Exception("Datos inválidos");
+    if (stripos($contentType, 'application/json') !== false) {
+        $data = json_decode($input, true);
+    } else {
+        // FormData / x-www-form-urlencoded
+        $data = !empty($_POST) ? $_POST : null;
+        if ($data === null && !empty($input)) {
+            parse_str($input, $parsed);
+            $data = !empty($parsed) ? $parsed : null;
+        }
     }
 
-    $concepto = $data['concepto'] ?? '';
-    $monto = $data['monto'] ?? 0;
-    $metodo_pago = $data['metodo_pago'] ?? '';
-    $tipoPagoId = $data['tipo_pago_id'] ?? 1;
-    $numero = $data['numero'] ?? '';
-    $precio = $data['precio'] ?? 0;
-    $dniEstudiante = $data['dni_estudiante'] ?? '';
-    $nombreEstudiante = $data['nombre_estudiante'] ?? '';
+    if (!is_array($data)) {
+        throw new Exception('Datos inválidos');
+    }
+
+    $concepto = $data['concepto'] ?? $data['concepto_pago'] ?? '';
+    $metodo_pago = $data['metodo_pago'] ?? $data['metodoPago'] ?? '';
+    $tipoPagoId = $data['tipo_pago_id'] ?? $data['tipoPagoId'] ?? $data['id'] ?? 1;
+    $numero = $data['numero'] ?? $data['numero_pago'] ?? '';
+    $dniEstudiante = $data['dni_estudiante'] ?? $data['dni'] ?? '';
+    $nombreEstudiante = $data['nombre_estudiante'] ?? $data['nombre'] ?? '';
+
+    // En la vista de pagos se envía 'precio' como monto original, y 'monto_total' como total con descuento.
+    // Para el backend, el monto base debe ser el MONTO ORIGINAL para calcular descuento de forma segura.
+    if (isset($data['precio']) && is_numeric($data['precio'])) {
+        $precio = (float)$data['precio'];
+        $monto = $precio;
+    } else {
+        $monto = $data['monto'] ?? $data['monto_original'] ?? $data['monto_total'] ?? 0;
+        $precio = $data['precio'] ?? 0;
+    }
+
+    $monto = is_numeric($monto) ? (float)$monto : 0;
+    $tipoPagoId = is_numeric($tipoPagoId) ? (int)$tipoPagoId : 1;
 
     // Validaciones
     if (empty($metodo_pago)) {
@@ -411,6 +435,32 @@ try {
     }
 
     $pagoId = $db->lastInsertId();
+
+    try {
+        $usuarioIdNotif = $usuarioRow['id'] ?? null;
+        if (!$usuarioIdNotif && !empty($usuarioSesion)) {
+            $stmtUsrNotif = $db->prepare('SELECT id FROM usuarios WHERE usuario = :usuario LIMIT 1');
+            $stmtUsrNotif->execute([':usuario' => $usuarioSesion]);
+            $usuarioIdNotif = $stmtUsrNotif->fetchColumn() ?: null;
+        }
+
+        $tituloSeguro = htmlspecialchars((string)$concepto, ENT_QUOTES, 'UTF-8');
+        $montoSeguro = number_format((float)$montoFinal, 2, '.', ',');
+
+        $notificacion = new NotificacionModel();
+        $notificacion->crear([
+            'usuario_id' => $usuarioIdNotif,
+            'usuario_nombre' => !empty($nombreEstudiante) ? $nombreEstudiante : (!empty($usuarioSesion) ? $usuarioSesion : 'Sistema'),
+            'tipo' => 'success',
+            'titulo' => 'Pago exitoso',
+            'mensaje' => 'Tu pago por <strong>' . $tituloSeguro . '</strong> fue registrado correctamente. Monto final: <strong>S/ ' . $montoSeguro . '</strong>.',
+            'modulo' => 'pagos',
+            'accion' => 'pago_exitoso',
+            'referencia_id' => (int)$pagoId,
+        ]);
+    } catch (Throwable $e) {
+        error_log('Error creando notificación de pago: ' . $e->getMessage());
+    }
 
     echo json_encode([
         'success' => true,

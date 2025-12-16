@@ -13,6 +13,15 @@ if ($_SESSION['rol'] !== 'admin') {
     exit;
 }
 
+$nombreAside = trim((string)($_SESSION['nombre'] ?? ''));
+$dniAside = trim((string)($_SESSION['dni'] ?? ''));
+if ($dniAside === '') {
+    $userSesion = (string)($_SESSION['usuario'] ?? '');
+    if (preg_match('/^(\d{8})@/i', $userSesion, $m)) {
+        $dniAside = $m[1];
+    }
+}
+
 // Procesar acciones ANTES de cualquier output
 // 1. Procesar agregar/editar usuario de la tabla usuarios
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['usuario']) && !isset($_POST['accion'])) {
@@ -705,7 +714,7 @@ if (!file_exists(__DIR__ . "/" . $ruta)) {
 
 // Función para botón activo
 function activo($id, $pagina){
-    return $id === $pagina ? 'bg-gradient-to-r from-blue-600 to-blue-400 text-white' : 'text-white/80 hover:bg-gradient-to-r hover:from-blue-500 hover:to-blue-400';
+    return $id === $pagina ? 'bg-blue-600 text-white' : 'text-white/80 hover:bg-white/10';
 }
 ?>
 
@@ -761,31 +770,34 @@ function activo($id, $pagina){
         </span>
         <p class="text-sm text-gray-300">Administrador</p>
       </div>
+
+      <div class="mt-3 text-center">
+        <?php if ($nombreAside !== ''): ?>
+          <div class="text-sm font-semibold text-white/90"><?= htmlspecialchars($nombreAside, ENT_QUOTES, 'UTF-8') ?></div>
+        <?php endif; ?>
+        <?php if ($dniAside !== ''): ?>
+          <div class="text-xs text-gray-300">DNI: <?= htmlspecialchars($dniAside, ENT_QUOTES, 'UTF-8') ?></div>
+        <?php endif; ?>
+      </div>
     </div>
 
     <div class="mx-8 mb-6 h-[2px] bg-gradient-to-r from-transparent via-blue-400/40 to-transparent"></div>
 
     <!-- MENÚ HARD-CODED CON ICONOS DE FONT AWESOME -->
     <nav class="flex flex-col gap-3 px-5">
-      <button onclick="window.location='?pagina=panel-admin'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo('panel-admin', $pagina) ?>">
-        <span class="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-400 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-700"></span>
-        <span class="absolute inset-0 bg-white/5 group-hover:bg-white/10 rounded-2xl transition-all duration-700"></span>
-        <i class="fas fa-users-gear text-xl relative z-10"></i>
-        <span class="relative z-10">ADMINISTRAR USUARIOS</span>
+      <button onclick="window.location='?pagina=panel-admin'" class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-colors duration-200 <?= activo('panel-admin', $pagina) ?>">
+        <i class="fas fa-users-gear text-xl"></i>
+        <span>ADMINISTRAR USUARIOS</span>
       </button>
 
-      <button onclick="window.location='?pagina=admin-caja'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo('admin-caja', $pagina) ?>">
-        <span class="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-400 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-700"></span>
-        <span class="absolute inset-0 bg-white/5 group-hover:bg-white/10 rounded-2xl transition-all duration-700"></span>
-        <i class="fas fa-cash-register text-xl relative z-10"></i>
-        <span class="relative z-10">ADMINISTRAR CAJA</span>
+      <button onclick="window.location='?pagina=admin-caja'" class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-colors duration-200 <?= activo('admin-caja', $pagina) ?>">
+        <i class="fas fa-cash-register text-xl"></i>
+        <span>ADMINISTRAR CAJA</span>
       </button>
 
-      <button onclick="window.location='?pagina=admin-sistema'" class="relative flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-all duration-500 hover:translate-x-2 overflow-hidden group <?= activo('admin-sistema', $pagina) ?>">
-        <span class="absolute inset-0 bg-gradient-to-r from-blue-600 to-blue-400 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-700"></span>
-        <span class="absolute inset-0 bg-white/5 group-hover:bg-white/10 rounded-2xl transition-all duration-700"></span>
-        <i class="fas fa-gears text-xl relative z-10"></i>
-        <span class="relative z-10">ADMINISTRAR SISTEMA</span>
+      <button onclick="window.location='?pagina=admin-sistema'" class="flex items-center gap-4 px-5 py-3 rounded-2xl font-semibold transition-colors duration-200 <?= activo('admin-sistema', $pagina) ?>">
+        <i class="fas fa-gears text-xl"></i>
+        <span>ADMINISTRAR SISTEMA</span>
       </button>
     </nav>
 

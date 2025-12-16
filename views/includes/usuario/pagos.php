@@ -676,9 +676,20 @@ try {
         method: 'POST',
         body: formData
       })
-      .then(response => {
-        if (!response.ok) throw new Error('Error en la respuesta del servidor');
-        return response.json();
+      .then(async (response) => {
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (e) {
+          data = null;
+        }
+
+        if (!response.ok) {
+          const msg = (data && (data.error || data.message)) ? (data.error || data.message) : 'Error en la respuesta del servidor';
+          throw new Error(msg);
+        }
+
+        return data;
       })
       .then(data => {
         if (data.success) {
@@ -721,7 +732,7 @@ try {
       })
       .catch(error => {
         console.error('Error:', error);
-        mostrarMensaje('Error de conexión. Por favor, verifica tu conexión a internet.', 'error');
+        mostrarMensaje(error?.message || 'Error de conexión. Por favor, verifica tu conexión a internet.', 'error');
         submitButton.classList.add('glow-effect');
       })
       .finally(() => {
